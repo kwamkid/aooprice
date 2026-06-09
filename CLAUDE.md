@@ -5,6 +5,9 @@
 
 Repo: https://github.com/kwamkid/aooprice · เจ้าของร้านขายบน Shopee
 
+> 📘 **วิธีติดตั้ง + ใช้งานทีละขั้น** อยู่ที่ [SETUP.md](./SETUP.md)
+> (setup Neon, รัน web, ติดตั้ง+ตั้งค่า extension, ดึงข้อมูลจริง, deploy Vercel, แก้ปัญหา)
+
 ---
 
 ## สถาปัตยกรรม (สำคัญ — อ่านก่อนแก้)
@@ -109,6 +112,8 @@ npm run build        # production build
 ```
 
 Extension: `chrome://extensions` → Developer mode → Load unpacked → เลือก `extension/`
+
+> ขั้นตอนละเอียด (ตั้งค่า popup, ดึงข้อมูลจริง, deploy, แก้ปัญหา) → ดู [SETUP.md](./SETUP.md)
 
 ---
 
