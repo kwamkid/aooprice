@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        width: 320px;
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 14px;
+        font-size: 13px;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 15px;
+        margin: 0 0 10px;
+        color: #f97316;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        color: #666;
+        margin: 8px 0 2px;
+      }
+      input,
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 8px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 12px;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 56px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .row input[type="number"] {
+        width: 70px;
+      }
+      button {
+        margin-top: 10px;
+        width: 100%;
+        padding: 9px;
+        border: none;
+        border-radius: 6px;
+        background: #f97316;
+        color: #fff;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #e5e7eb;
+        color: #333;
+      }
+      #status {
+        margin-top: 10px;
+        font-size: 11px;
+        color: #555;
+        white-space: pre-wrap;
+        max-height: 90px;
+        overflow: auto;
+      }
+      .muted {
+        color: #999;
+        font-size: 11px;
+      }
+      hr {
+        border: none;
+        border-top: 1px solid #eee;
+        margin: 12px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>aooprice</h1>
+
+    <label>Backend URL (Vercel)</label>
+    <input id="backendUrl" placeholder="https://aooprice.vercel.app" />
+
+    <label>Ingest Token</label>
+    <input id="ingestToken" type="password" placeholder="INGEST_TOKEN" />
+
+    <label>ชื่อร้านเรา (ไว้ไฮไลต์)</label>
+    <input id="myShop" placeholder="เช่น pungklombabyshop" />
+
+    <label>Keywords (บรรทัดละ 1 คำ)</label>
+    <textarea id="keywords" placeholder="GB Pockit+ All Terrain&#10;STOKKE YOYO3 6+"></textarea>
+
+    <hr />
+
+    <div class="row">
+      <input type="checkbox" id="autoEnabled" style="width: auto" />
+      <label for="autoEnabled" style="margin: 0">เปิด Auto</label>
+      <span style="margin-left: auto" class="muted">ทุก</span>
+      <input id="intervalHours" type="number" min="1" value="24" />
+      <span class="muted">ชม.</span>
+    </div>
+
+    <button id="save">บันทึกการตั้งค่า</button>
+    <button id="runNow" class="secondary">⟳ ดึงเดี๋ยวนี้ (ทุก keyword)</button>
+
+    <div id="status"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
