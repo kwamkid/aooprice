@@ -1,6 +1,7 @@
 # aooprice — คู่มือการใช้งาน (SETUP)
 
-คู่มือ setup + ใช้งานแบบทีละขั้น ตั้งแต่ติดตั้งจนถึงดึงข้อมูล Shopee จริง
+คู่มือ setup + ใช้งานแบบทีละขั้น ตั้งแต่ติดตั้งจนถึงดึงข้อมูลจริง
+(รองรับ **Shopee / TikTok Shop / Lazada** — keyword เดียวเทียบได้ทั้ง 3 platform)
 
 ---
 
@@ -8,7 +9,7 @@
 
 1. **web/** — เว็บ dashboard + API (รันบนเครื่อง หรือ deploy Vercel)
 2. **Neon** — ฐานข้อมูล Postgres (cloud)
-3. **extension/** — Chrome Extension ที่ดึงข้อมูลจาก Shopee แล้วส่งเข้า web
+3. **extension/** — Chrome Extension ที่ดึงข้อมูลจาก Shopee / TikTok Shop / Lazada แล้วส่งเข้า web
 
 > ลำดับที่ต้องทำ: ตั้ง Neon → รัน web → ติดตั้ง extension → ตั้งค่า → ดึงข้อมูล
 
@@ -57,35 +58,36 @@ npm run dev          # เปิด http://localhost:3000
 
 ---
 
-## STEP 4 — ตั้งค่า Extension
+## STEP 4 — ตั้งค่า
 
-คลิกไอคอน aooprice → กรอก:
+Backend URL / Token เป็นค่า **fix ใน `extension/config.js`** (แก้ที่ไฟล์นี้ที่เดียว
+ถ้าเปลี่ยน backend หรือ rotate token) — ไม่ต้องกรอกใน popup.
 
-| ช่อง | ใส่อะไร |
-|------|---------|
-| **Backend URL** | `http://localhost:3000` (ตอนเทส) หรือ URL Vercel ตอน deploy |
-| **Ingest Token** | ค่าเดียวกับ `INGEST_TOKEN` ใน `web/.env` |
-| **ชื่อร้านเรา** | ชื่อร้านบน Shopee ของเรา (ไว้ไฮไลต์สีฟ้าในตาราง) เช่น `pungklombabyshop` |
-| **Keywords** | คำค้นที่อยากติดตาม บรรทัดละ 1 คำ เช่น `GB Pockit+ All Terrain` |
-| **เปิด Auto** | ติ๊กถ้าอยากให้ดึงเองตามเวลา + ตั้งช่วงเป็นชั่วโมง (เช่น 24) |
+> 🔑 ค่าเริ่มต้น: `BACKEND_URL = "https://aooprice.vercel.app"` (ตอนเทส localhost
+> สลับเป็น `http://localhost:3000`), `INGEST_TOKEN` ตรงกับ `web/.env`
 
-> 🔑 INGEST_TOKEN ของโปรเจกต์นี้ (จาก setup ล่าสุด):
-> `4442271b18efd8bb07e0e2de8287c70a26e1a501de860397`
-> *(ถ้า rotate ใหม่ใน .env แล้ว ต้องอัพเดทช่องนี้ให้ตรงด้วย)*
+**4.1 keyword + ชื่อร้านเรา → ตั้งที่หน้าเว็บ** `http://localhost:3000/settings`
+- เพิ่ม **keyword** ที่อยากติดตาม (ใช้ร่วมกันทุก platform)
+- กรอก **ชื่อร้านของเรา แยก 3 ช่อง**: Shopee / TikTok Shop / Lazada
+  (ชื่อร้านแต่ละ platform มักไม่เหมือนกัน — ไว้ไฮไลต์ "ร้านเรา" ในตาราง) → กดบันทึก
 
-กด **บันทึกการตั้งค่า**
+**4.2 ใน popup ของ extension**
+- ติ๊ก **platform ที่จะดึง** (Shopee / TikTok / Lazada — ดึงครบทุกตัวเป็น default)
+- (ทางเลือก) เปิด **Auto** + ตั้งช่วงชั่วโมง → กด **บันทึก Auto**
 
 ---
 
-## STEP 5 — ดึงข้อมูล Shopee จริง
+## STEP 5 — ดึงข้อมูลจริง (Shopee / TikTok / Lazada)
 
 ### วิธี A — Manual (กดเอง)
-1. เปิด **shopee.co.th** แล้ว **login** ให้เรียบร้อย
+1. **login** ให้เรียบร้อยในเว็บ platform ที่จะดึง (shopee.co.th / tiktok.com / lazada.co.th)
 2. **วิธีที่ 1:** คลิกไอคอน aooprice → กด **⟳ ดึงเดี๋ยวนี้ (ทุก keyword)**
-   - ถ้าไม่มีแท็บ Shopee เปิดอยู่ extension จะเปิดให้เอง
-3. **วิธีที่ 2:** ไปหน้า search ของ keyword นั้นบน Shopee →
-   กดปุ่ม **⟳ aooprice Rescan** สีส้มมุมขวาล่าง
-4. กลับมาดูที่ http://localhost:3000 → ข้อมูลควรเข้าตาราง
+   - background จะวนทุก platform ที่ติ๊กไว้ × ทุก keyword: เปิดแท็บ search ให้เอง
+     ทีละคำ แล้วดึง (TikTok/Lazada พึ่งหน้า search จริง จึงต้องให้เปิดแท็บ)
+3. **วิธีที่ 2:** ไปหน้า search ของ keyword นั้นบน platform ไหนก็ได้ →
+   กดปุ่ม **⟳ aooprice (ชื่อ platform)** มุมขวาล่าง (จะดึงเฉพาะ platform หน้านั้น)
+4. หรือกดปุ่ม **"ดึงเดี๋ยวนี้"** บนหน้าเว็บ `/settings` → extension ที่เปิดอยู่จะมารับคิวไปทำ
+5. กลับมาดูที่ dashboard → ข้อมูลควรเข้าตาราง (มี badge platform + filter)
 
 ### วิธี B — Auto (ตั้งเวลา)
 - ติ๊ก "เปิด Auto" + ตั้งชั่วโมงใน popup → extension จะดึงเองตามรอบ
@@ -109,12 +111,13 @@ npm run dev          # เปิด http://localhost:3000
 
 | อาการ | สาเหตุ / วิธีแก้ |
 |-------|----------------|
-| กดดึงแล้ว "ไม่พบสินค้า (อาจโดน anti-bot)" | Shopee บล็อก — ลอง login ใหม่, เปิดหน้า search ค้างไว้ก่อนกด, ลดความถี่ |
-| "ยังไม่ได้ตั้งค่า backend URL / token" | ยังไม่กดบันทึกใน popup หรือกรอกไม่ครบ |
-| ingest 401 | INGEST_TOKEN ใน popup ไม่ตรงกับใน `web/.env` |
-| ตารางไม่มีข้อมูลหลังดึง | ดู console ของแท็บ Shopee (F12) ว่า fetch สำเร็จไหม / Backend URL ถูกไหม |
-| ร้านเราไม่ถูกไฮไลต์ | ชื่อ "ร้านเรา" ต้องตรงเป๊ะกับ shop_name ที่ Shopee คืนมา |
+| "ไม่พบสินค้า (อาจโดน anti-bot)" | ยังไม่ login / โดนบล็อก / อยู่ผิดหน้า — login ใหม่, เปิดหน้า search ของ platform นั้นค้างไว้, ลดความถี่ |
+| ingest 401 | `INGEST_TOKEN` ใน `extension/config.js` ไม่ตรงกับใน `web/.env` |
+| ตารางไม่มีข้อมูลหลังดึง | เปิด console ของแท็บ platform (F12) ดูว่า fetch/DOM สำเร็จไหม / `BACKEND_URL` ใน config.js ถูกไหม |
+| ร้านเราไม่ถูกไฮไลต์ | ชื่อ "ร้านเรา" ของ **platform นั้น** (ใน `/settings`) ต้องตรงเป๊ะกับ shop_name ที่ดึงมา |
+| TikTok/Lazada ดึงได้ไม่ครบ/ว่าง | endpoint/selector เป็น best-guess — ดู warning ใน console แล้วปรับ `extension/lib/tiktok-api.js` / `lazada-api.js` ให้ตรงกับโครงหน้าเว็บจริง |
 
-> ⚠️ Shopee internal API ไม่เป็นทางการ — ถ้าวันหนึ่งดึงไม่ได้เลย อาจเพราะ
-> Shopee เปลี่ยน API/anti-bot ต้องปรับ `extension/lib/shopee-api.js`
-> (แผนสำรอง: เปลี่ยนไปอ่าน DOM ของหน้า search แทน)
+> ⚠️ internal API ทั้ง 3 platform ไม่เป็นทางการ — ถ้าวันหนึ่งดึงไม่ได้เลย อาจเพราะ
+> platform เปลี่ยน API/anti-bot/โครง DOM. ปรับได้ที่ fetcher ของ platform นั้น
+> (`extension/lib/{shopee,tiktok,lazada}-api.js`). แต่ละตัวลอง API ก่อน → fallback DOM,
+> และ map ออกเป็น schema กลางเดียวกัน จึงไม่ต้องแตะ backend.

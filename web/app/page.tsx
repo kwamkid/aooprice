@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { neon } from "@neondatabase/serverless";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { IconTag, IconStore, IconChart } from "@/components/ui/icons";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +18,9 @@ type KwCard = {
   label: string | null;
   my_shop: string | null;
   product_count: number;
+  shopee_count: number;
+  tiktok_count: number;
+  lazada_count: number;
   min_price: number | null;
   max_price: number | null;
   last_captured: string | null;
@@ -19,11 +28,11 @@ type KwCard = {
 };
 
 async function getKeywords(): Promise<KwCard[]> {
-  // การ์ดสรุปต่อ keyword: จำนวนร้าน, ราคาต่ำ/สูง, อันดับร้านเรา, ความสด
+  // การ์ดสรุปต่อ keyword: จำนวนร้าน (+ แยกตาม platform), ราคาต่ำ/สูง, อันดับร้านเรา, ความสด
   const rows = await sql`
     WITH latest AS (
       SELECT DISTINCT ON (p.id)
-        p.id, p.keyword_id, p.shop_name, s.price, s.captured_at
+        p.id, p.keyword_id, p.platform, p.shop_name, s.price, s.captured_at
       FROM products p
       JOIN snapshots s ON s.product_id = p.id
       ORDER BY p.id, s.captured_at DESC
@@ -34,14 +43,25 @@ async function getKeywords(): Promise<KwCard[]> {
     )
     SELECT
       k.id, k.keyword, k.label, k.my_shop,
+      k.my_shop_shopee, k.my_shop_tiktok, k.my_shop_lazada,
       COUNT(r.id)::int          AS product_count,
+      COUNT(r.id) FILTER (WHERE r.platform = 'shopee')::int AS shopee_count,
+      COUNT(r.id) FILTER (WHERE r.platform = 'tiktok')::int AS tiktok_count,
+      COUNT(r.id) FILTER (WHERE r.platform = 'lazada')::int AS lazada_count,
       MIN(r.price)              AS min_price,
       MAX(r.price)              AS max_price,
       MAX(r.captured_at)        AS last_captured,
-      MIN(CASE WHEN k.my_shop IS NOT NULL AND r.shop_name = k.my_shop THEN r.rnk END)::int AS my_rank
+      MIN(CASE WHEN r.shop_name IS NOT NULL AND r.shop_name = (
+            CASE r.platform
+              WHEN 'shopee' THEN COALESCE(k.my_shop_shopee, k.my_shop)
+              WHEN 'tiktok' THEN k.my_shop_tiktok
+              WHEN 'lazada' THEN k.my_shop_lazada
+            END
+          ) THEN r.rnk END)::int AS my_rank
     FROM keywords k
     LEFT JOIN ranked r ON r.keyword_id = k.id
-    GROUP BY k.id, k.keyword, k.label, k.my_shop
+    GROUP BY k.id, k.keyword, k.label, k.my_shop,
+             k.my_shop_shopee, k.my_shop_tiktok, k.my_shop_lazada
     ORDER BY k.id
   `;
   return rows as KwCard[];
@@ -52,11 +72,10 @@ function fmtPrice(n: number | null) {
 }
 
 function staleBadge(last: string | null) {
-  if (!last) return <span className="text-xs text-red-500">ยังไม่มีข้อมูล</span>;
+  if (!last) return <Badge tone="danger">ยังไม่มีข้อมูล</Badge>;
   const ageH = (Date.now() - new Date(last).getTime()) / 3.6e6;
-  if (ageH > 26)
-    return <span className="text-xs text-amber-600">ข้อมูลเก่า · เปิด Extension</span>;
-  return <span className="text-xs text-green-600">อัพเดทล่าสุด {Math.round(ageH)} ชม.</span>;
+  if (ageH > 26) return <Badge tone="warning">ข้อมูลเก่า · เปิด Extension</Badge>;
+  return <Badge tone="success">อัพเดท {Math.round(ageH)} ชม.ก่อน</Badge>;
 }
 
 export default async function HomePage() {
@@ -68,60 +87,115 @@ export default async function HomePage() {
     dbError = true;
   }
 
+  const totalShops = keywords.reduce((s, k) => s + (k.product_count || 0), 0);
+  const tracked = keywords.filter((k) => k.last_captured).length;
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">สินค้า / Keyword ที่ติดตาม</h1>
-        <span className="text-sm text-gray-400">{keywords.length} รายการ</span>
-      </div>
+      <PageHeader
+        title={<>ภาพรวม<span className="gradient-text">การติดตามราคา</span></>}
+        subtitle="สรุปสินค้า/คู่แข่งที่ติดตามบน Shopee"
+        action={<Badge tone="brand">{keywords.length} keyword</Badge>}
+      />
 
       {dbError && (
-        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          เชื่อมต่อฐานข้อมูลไม่ได้ — ตรวจ <code>DATABASE_URL</code> ใน .env แล้วรัน{" "}
-          <code>npm run db:push</code>
-        </div>
+        <EmptyState tone="danger" title="เชื่อมต่อฐานข้อมูลไม่ได้">
+          ตรวจ <code className="rounded bg-white/10 px-1">DATABASE_URL</code> ใน .env แล้วรัน{" "}
+          <code className="rounded bg-white/10 px-1">npm run db:push</code>
+        </EmptyState>
       )}
 
-      {!dbError && keywords.length === 0 && (
-        <div className="rounded border border-dashed bg-white p-8 text-center text-gray-500">
-          ยังไม่มี keyword — เพิ่มผ่าน Extension หรือรัน <code>npm run db:seed</code>{" "}
-          เพื่อใส่ข้อมูลตัวอย่าง
-        </div>
-      )}
+      {!dbError && (
+        <>
+          {/* KPI */}
+          <div className="mb-6 grid gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Keyword ที่ติดตาม"
+              value={keywords.length}
+              hint={`${tracked} รายการมีข้อมูลแล้ว`}
+              icon={<IconTag width={20} height={20} />}
+            />
+            <StatCard
+              label="ร้าน/สินค้ารวม"
+              value={totalShops}
+              hint="จากทุก keyword"
+              icon={<IconStore width={20} height={20} />}
+            />
+            <StatCard
+              label="สถานะข้อมูล"
+              value={tracked === keywords.length && keywords.length > 0 ? "สด" : "บางส่วน"}
+              hint="อัพเดทผ่าน Extension"
+              icon={<IconChart width={20} height={20} />}
+            />
+          </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {keywords.map((k) => (
-          <Link
-            key={k.id}
-            href={`/k/${k.id}`}
-            className="block rounded-lg border bg-white p-4 hover:shadow-md transition"
-          >
-            <div className="font-semibold mb-1 line-clamp-1">
-              {k.label || k.keyword}
+          {keywords.length === 0 ? (
+            <EmptyState icon="🏷️" title="ยังไม่มี keyword">
+              เพิ่มผ่าน Extension หรือรัน{" "}
+              <code className="rounded bg-white/10 px-1">npm run db:seed</code>{" "}
+              เพื่อใส่ข้อมูลตัวอย่าง
+            </EmptyState>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {keywords.map((k) => (
+                <Link key={k.id} href={`/k/${k.id}`} className="block">
+                  <Card hover className="h-full p-5">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="line-clamp-1 font-semibold">
+                          {k.label || k.keyword}
+                        </div>
+                        <div className="muted line-clamp-1 text-xs">{k.keyword}</div>
+                      </div>
+                      {k.my_rank != null && (
+                        <Badge tone="accent">ร้านเรา #{k.my_rank}</Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <div className="muted text-xs">ช่วงราคา</div>
+                        <div className="text-lg font-bold gradient-text">
+                          {fmtPrice(k.min_price)} – {fmtPrice(k.max_price)}
+                        </div>
+                      </div>
+                      <div className="muted text-right text-xs">
+                        {k.product_count} ร้าน
+                      </div>
+                    </div>
+
+                    {(k.shopee_count > 0 ||
+                      k.tiktok_count > 0 ||
+                      k.lazada_count > 0) && (
+                      <div className="muted mt-3 flex flex-wrap gap-x-2 gap-y-1 text-xs">
+                        {k.shopee_count > 0 && (
+                          <span className="text-orange-300">
+                            Shopee {k.shopee_count}
+                          </span>
+                        )}
+                        {k.tiktok_count > 0 && (
+                          <span className="text-pink-200">
+                            TikTok {k.tiktok_count}
+                          </span>
+                        )}
+                        {k.lazada_count > 0 && (
+                          <span className="text-indigo-300">
+                            Lazada {k.lazada_count}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-4 border-t border-[var(--border)] pt-3">
+                      {staleBadge(k.last_captured)}
+                    </div>
+                  </Card>
+                </Link>
+              ))}
             </div>
-            <div className="text-xs text-gray-400 mb-3 line-clamp-1">
-              {k.keyword}
-            </div>
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-xs text-gray-400">ช่วงราคา</div>
-                <div className="font-bold text-orange-600">
-                  {fmtPrice(k.min_price)} – {fmtPrice(k.max_price)}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-400">{k.product_count} ร้าน</div>
-                {k.my_rank != null && (
-                  <div className="text-xs font-medium text-blue-600">
-                    ร้านเรา #{k.my_rank}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="mt-3 pt-2 border-t">{staleBadge(k.last_captured)}</div>
-          </Link>
-        ))}
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

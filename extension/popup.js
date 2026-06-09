@@ -1,52 +1,51 @@
-// popup — ตั้งค่า + ปุ่มดึงเดี๋ยวนี้ (manual)
+// popup — แค่ toggle Auto + ปุ่มดึงเดี๋ยวนี้ + เปิดหน้าตั้งค่าบนเว็บ
+// (Backend URL / token เป็นค่า fix ใน config.js · keyword/ชื่อร้านจัดการบนเว็บ)
+
+import { apiBase } from "./config.js";
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
+const setStatus = (msg) => (statusEl.textContent = msg);
 
-function setStatus(msg) {
-  statusEl.textContent = msg;
-}
-
-// โหลดค่าเดิม
+// โหลดค่า Auto + platform ที่เลือก + สถานะล่าสุด
 async function load() {
   const sync = await chrome.storage.sync.get([
-    "backendUrl",
-    "ingestToken",
-    "myShop",
-    "keywords",
     "autoEnabled",
     "intervalHours",
+    "platforms",
   ]);
-  $("backendUrl").value = sync.backendUrl || "";
-  $("ingestToken").value = sync.ingestToken || "";
-  $("myShop").value = sync.myShop || "";
-  $("keywords").value = (sync.keywords || []).join("\n");
   $("autoEnabled").checked = !!sync.autoEnabled;
   $("intervalHours").value = sync.intervalHours || 24;
 
-  const local = await chrome.storage.local.get(["lastRunAt", "lastResult"]);
+  // default: เปิดครบทุก platform ถ้ายังไม่เคยตั้ง
+  const pf = sync.platforms || { shopee: true, tiktok: true, lazada: true };
+  $("pf-shopee").checked = pf.shopee !== false;
+  $("pf-tiktok").checked = pf.tiktok !== false;
+  $("pf-lazada").checked = pf.lazada !== false;
+
+  const local = await chrome.storage.local.get(["lastRunAt"]);
   if (local.lastRunAt) {
     const ago = Math.round((Date.now() - local.lastRunAt) / 60000);
     setStatus(`ดึงล่าสุด: ${ago} นาทีที่แล้ว`);
   }
 }
 
-// บันทึก
-$("save").onclick = async () => {
-  const keywords = $("keywords")
-    .value.split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
+// เปิดหน้าตั้งค่าบนเว็บ
+$("openWeb").onclick = () => {
+  chrome.tabs.create({ url: apiBase() + "/settings" });
+};
 
+// บันทึกค่า Auto + platform ที่เลือก
+$("save").onclick = async () => {
   await chrome.storage.sync.set({
-    backendUrl: $("backendUrl").value.trim(),
-    ingestToken: $("ingestToken").value.trim(),
-    myShop: $("myShop").value.trim(),
-    keywords,
     autoEnabled: $("autoEnabled").checked,
     intervalHours: Number($("intervalHours").value) || 24,
+    platforms: {
+      shopee: $("pf-shopee").checked,
+      tiktok: $("pf-tiktok").checked,
+      lazada: $("pf-lazada").checked,
+    },
   });
-
   await chrome.runtime.sendMessage({ type: "SYNC_ALARM" });
   setStatus("บันทึกแล้ว ✓" + ($("autoEnabled").checked ? " · Auto เปิด" : ""));
 };
@@ -59,8 +58,11 @@ $("runNow").onclick = async () => {
     const resp = await chrome.runtime.sendMessage({ type: "RUN_NOW" });
     if (resp?.ok) {
       const results = resp.resp?.resp?.results || resp.resp?.results || [];
+      const tag = (r) => (r.platform ? `[${r.platform}] ` : "");
       const lines = (results || []).map((r) =>
-        r.error ? `✗ ${r.keyword}: ${r.error}` : `✓ ${r.keyword}: ${r.sent} รายการ`,
+        r.error
+          ? `✗ ${tag(r)}${r.keyword || ""}: ${r.error}`
+          : `✓ ${tag(r)}${r.keyword}: ${r.sent} รายการ`,
       );
       setStatus(lines.join("\n") || "เสร็จ");
     } else {

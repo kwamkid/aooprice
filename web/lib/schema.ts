@@ -1,9 +1,9 @@
 import {
   pgTable,
   serial,
-  bigint,
   bigserial,
   integer,
+  // หมายเหตุ: itemId/shopId เปลี่ยนเป็น text แล้ว (รองรับ multi-platform) จึงไม่ใช้ bigint
   text,
   numeric,
   boolean,
@@ -12,16 +12,31 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
-// keyword ที่ผู้ใช้ติดตาม
+// แพลตฟอร์มที่รองรับ — เก็บเป็น text (ไม่ใช่ enum) เพื่อเพิ่ม platform ใหม่ได้ง่าย
+export type Platform = "shopee" | "tiktok" | "lazada";
+
+// ค่าตั้งค่ารวมแบบ key-value (เก็บ my_shop รวม + flag สั่งดึงจากเว็บ)
+// ใช้ key คงที่: "my_shop", "scrape_request" (ISO timestamp ตอนกดปุ่มดึงบนเว็บ)
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// keyword ที่ผู้ใช้ติดตาม (ไม่ผูกกับ platform — keyword เดียวเห็นได้ทุก platform)
 export const keywords = pgTable("keywords", {
   id: serial("id").primaryKey(),
   keyword: text("keyword").notNull().unique(),
   label: text("label"), // ชื่อแสดงผล เช่น "GB Pockit+ All Terrain"
-  myShop: text("my_shop"), // ชื่อร้านเรา ไว้ไฮไลต์ในตาราง
+  myShop: text("my_shop"), // (legacy) ชื่อร้านเรารวม — เก็บไว้เผื่อ backward compat
+  // ชื่อร้านเราแยกต่อ platform (ชื่อร้านมักไม่เหมือนกันข้าม marketplace) ไว้ไฮไลต์ในตาราง
+  myShopShopee: text("my_shop_shopee"),
+  myShopTiktok: text("my_shop_tiktok"),
+  myShopLazada: text("my_shop_lazada"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
-// ตัวสินค้า/ร้าน (unique ต่อ item ภายใต้ keyword) — ข้อมูลที่ไม่ค่อยเปลี่ยน
+// ตัวสินค้า/ร้าน (unique ต่อ item ภายใต้ keyword+platform) — ข้อมูลที่ไม่ค่อยเปลี่ยน
 export const products = pgTable(
   "products",
   {
@@ -29,16 +44,18 @@ export const products = pgTable(
     keywordId: integer("keyword_id")
       .notNull()
       .references(() => keywords.id, { onDelete: "cascade" }),
-    itemId: bigint("item_id", { mode: "number" }).notNull(), // Shopee itemid
-    shopId: bigint("shop_id", { mode: "number" }).notNull(), // Shopee shopid
+    platform: text("platform").notNull().default("shopee"), // shopee | tiktok | lazada
+    itemId: text("item_id").notNull(), // id สินค้า (text — รองรับ id ที่เป็น string ของ tiktok/lazada)
+    shopId: text("shop_id").notNull(), // id ร้าน (text)
     shopName: text("shop_name"),
     title: text("title"),
     imageUrl: text("image_url"),
     productUrl: text("product_url"),
   },
   (t) => ({
-    uniqItem: unique("uniq_keyword_item_shop").on(
+    uniqItem: unique("uniq_keyword_platform_item_shop").on(
       t.keywordId,
+      t.platform,
       t.itemId,
       t.shopId,
     ),
@@ -68,6 +85,7 @@ export const snapshots = pgTable(
   }),
 );
 
+export type Setting = typeof settings.$inferSelect;
 export type Keyword = typeof keywords.$inferSelect;
 export type Product = typeof products.$inferSelect;
 export type Snapshot = typeof snapshots.$inferSelect;

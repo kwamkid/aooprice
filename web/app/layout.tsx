@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
+import { IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
+import { AdminShell } from "@/components/AdminShell";
+
+const plexThai = IBM_Plex_Sans_Thai({
+  subsets: ["thai", "latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-plex-thai",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "aooprice — เทียบราคา Shopee",
@@ -12,19 +21,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="th">
+    <html lang="th" className={plexThai.variable}>
       <body>
-        <header className="border-b bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-            <a href="/" className="font-bold text-lg text-orange-600">
-              aoo<span className="text-gray-800">price</span>
-            </a>
-            <span className="text-xs text-gray-400">
-              เทียบราคา Shopee · อัพเดทผ่าน Extension
-            </span>
-          </div>
-        </header>
-        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+        <AdminShell>{children}</AdminShell>
       </body>
     </html>
   );

@@ -15,8 +15,8 @@ import {
 type SeriesPoint = { productId: number; day: string; price: number | null };
 
 const COLORS = [
-  "#f97316", "#3b82f6", "#10b981", "#ef4444", "#8b5cf6",
-  "#ec4899", "#14b8a6", "#f59e0b", "#6366f1", "#84cc16",
+  "#9168ff", "#22d3ee", "#34d399", "#f472b6", "#a78bfa",
+  "#38bdf8", "#fbbf24", "#fb7185", "#818cf8", "#2dd4bf",
 ];
 
 export default function PriceChart({
@@ -53,24 +53,38 @@ export default function PriceChart({
       .catch(() => setLoading(false));
   }, [keywordId]);
 
-  if (loading) return <div className="text-sm text-gray-400">กำลังโหลดกราฟ…</div>;
+  if (loading)
+    return <div className="text-sm text-[var(--muted)]">กำลังโหลดกราฟ…</div>;
   if (data.length === 0)
-    return <div className="text-sm text-gray-400">ยังไม่มีประวัติราคาเพียงพอ</div>;
+    return (
+      <div className="text-sm text-[var(--muted)]">ยังไม่มีประวัติราคาเพียงพอ</div>
+    );
 
+  const axisColor = "#9890b8";
   return (
     <ResponsiveContainer width="100%" height={320}>
       <LineChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-        <XAxis dataKey="day" fontSize={12} />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+        <XAxis dataKey="day" fontSize={12} stroke={axisColor} tickLine={false} />
         <YAxis
           fontSize={12}
+          stroke={axisColor}
+          tickLine={false}
           tickFormatter={(v) => "฿" + (v / 1000).toFixed(0) + "k"}
           domain={["auto", "auto"]}
         />
         <Tooltip
           formatter={(v: number) => "฿" + Number(v).toLocaleString("th-TH")}
+          contentStyle={{
+            background: "#150f2b",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 12,
+            color: "#ece9f5",
+            fontSize: 12,
+          }}
+          labelStyle={{ color: "#9890b8" }}
         />
-        <Legend />
+        <Legend wrapperStyle={{ fontSize: 12, color: "#9890b8" }} />
         {pids.map((pid, i) => (
           <Line
             key={pid}

@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "aooprice — Shopee Price Monitor",
-  "version": "0.1.0",
-  "description": "ดึงราคา/ยอดขาย/เรตติ้งสินค้า Shopee ตาม keyword แล้วส่งเข้า aooprice dashboard",
+  "name": "aooprice — Price Monitor (Shopee/TikTok/Lazada)",
+  "version": "0.2.0",
+  "description": "ดึงราคา/ยอดขาย/เรตติ้งสินค้า Shopee / TikTok Shop / Lazada ตาม keyword แล้วส่งเข้า aooprice dashboard",
   "permissions": ["alarms", "storage", "scripting", "tabs"],
   "host_permissions": [
     "https://shopee.co.th/*",
-    "https://*.shopee.co.th/*"
+    "https://*.shopee.co.th/*",
+    "https://*.tiktok.com/*",
+    "https://*.lazada.co.th/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -14,7 +16,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://shopee.co.th/*"],
+      "matches": [
+        "https://shopee.co.th/*",
+        "https://*.tiktok.com/*",
+        "https://*.lazada.co.th/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
@@ -25,8 +31,17 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["lib/shopee-api.js"],
-      "matches": ["https://shopee.co.th/*"]
+      "resources": [
+        "lib/shopee-api.js",
+        "lib/tiktok-api.js",
+        "lib/lazada-api.js",
+        "config.js"
+      ],
+      "matches": [
+        "https://shopee.co.th/*",
+        "https://*.tiktok.com/*",
+        "https://*.lazada.co.th/*"
+      ]
     }
   ],
   "icons": {
