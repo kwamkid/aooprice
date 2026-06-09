@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconTag, IconStore, IconChart } from "@/components/ui/icons";
+import { KeywordSearch } from "@/components/KeywordSearch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,6 +108,9 @@ export default async function HomePage() {
 
       {!dbError && (
         <>
+          {/* ค้นหา + favorite keyword ใหม่เข้าระบบติดตาม */}
+          <KeywordSearch existing={keywords.map((k) => k.keyword)} />
+
           {/* KPI */}
           <div className="mb-6 grid gap-4 sm:grid-cols-3">
             <StatCard
