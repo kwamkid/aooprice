@@ -34,6 +34,8 @@ export const keywords = pgTable("keywords", {
   myShopShopee: text("my_shop_shopee"),
   myShopTiktok: text("my_shop_tiktok"),
   myShopLazada: text("my_shop_lazada"),
+  // favorite — true = แสดงบน dashboard + auto-scrape ติดตาม. ค้นสด (ad-hoc) = false
+  isTracked: boolean("is_tracked").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 

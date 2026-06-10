@@ -8,12 +8,14 @@ export const runtime = "nodejs";
 
 export const OPTIONS = preflight;
 
-// GET /api/keywords — รายการ keyword ทั้งหมดที่ติดตาม
-// ใช้ทั้งเว็บ (หน้า settings) และ extension (ดึง keyword list มาทำงาน)
+// GET /api/keywords — รายการ keyword ที่ "ติดตาม" (favorite) เท่านั้น
+// ใช้ทั้งเว็บ (settings/favs check) และ extension (auto-scrape เฉพาะ tracked)
+// ค้นสด (ad-hoc) สร้าง keyword is_tracked=false จึงไม่โผล่ที่นี่
 export async function GET() {
   const rows = await db
     .select()
     .from(keywords)
+    .where(eq(keywords.isTracked, true))
     .orderBy(desc(keywords.createdAt));
   return withCors(NextResponse.json({ keywords: rows }));
 }
@@ -44,13 +46,15 @@ export async function POST(req: Request) {
   const norm = (v: string | undefined) => v?.trim() || null;
   const shopee = body.myShopShopee ?? body.myShop;
 
+  // POST = favorite/ติดตาม → set is_tracked=true (พลิก keyword ที่ค้นสดไว้ก่อนให้โผล่ dashboard)
   // เซ็ตเฉพาะคอลัมน์ที่ "ส่งมา" เพื่อไม่ทับค่าเดิมโดยไม่ตั้งใจ
   const updateSet: {
     label: string;
+    isTracked: boolean;
     myShopShopee?: string | null;
     myShopTiktok?: string | null;
     myShopLazada?: string | null;
-  } = { label };
+  } = { label, isTracked: true };
   if (shopee !== undefined) updateSet.myShopShopee = norm(shopee);
   if (body.myShopTiktok !== undefined) updateSet.myShopTiktok = norm(body.myShopTiktok);
   if (body.myShopLazada !== undefined) updateSet.myShopLazada = norm(body.myShopLazada);
@@ -60,6 +64,7 @@ export async function POST(req: Request) {
     .values({
       keyword: kw,
       label,
+      isTracked: true,
       myShopShopee: norm(shopee),
       myShopTiktok: norm(body.myShopTiktok),
       myShopLazada: norm(body.myShopLazada),

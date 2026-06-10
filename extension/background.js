@@ -125,8 +125,11 @@ async function pollSearchJob() {
   L("🎯 claim job:", job.id, "| keyword:", job.keyword, "| platform:", job.platform);
   try {
     const items = await scrapeAdhoc(job.platform || "shopee", job.keyword);
-    L("✅ ดึงได้", items.length, "รายการ → ส่งผลกลับ");
-    await postJobResult(job.id, { items });
+    L("✅ ดึงได้", items.length, "รายการ → ingest เข้า DB");
+    // เก็บเข้า DB (cache realtime) — keyword is_tracked=false จนกว่าจะ favorite
+    const shops = await fetchShops();
+    await ingestItems(job.keyword, items, shops);
+    await postJobResult(job.id, { items, done: true }); // set status=done = สัญญาณให้เว็บดึง /api/compare
   } catch (e) {
     L("❌ ดึงล้ม:", String(e.message || e), "→ ส่ง error กลับ");
     await postJobResult(job.id, { error: String(e.message || e) });
@@ -238,11 +241,24 @@ async function scrapeShopeeMainWorld(tabId, keyword, maxItems) {
 // ค้นสด: ใช้แท็บ platform ที่ "เปิดอยู่แล้ว" ก่อน (session อุ่น + ผ่าน CAPTCHA แล้ว)
 // เพราะแท็บที่เพิ่งเปิดใหม่ มักโดน CAPTCHA (Shopee เห็นเป็น session ไม่มีประวัติ browsing)
 // ไม่มีแท็บเดิม → เปิดใหม่เป็น fallback (อาจเจอ CAPTCHA — user ต้องเลื่อนเอง)
+// ===== ดึง 1 keyword 1 platform จากแท็บที่ระบุ (shared ทั้ง auto + realtime) =====
+// shopee → MAIN world (กัน 403) · tiktok/lazada → content DOM (SCRAPE_ONE_ADHOC)
+async function scrapePlatform(platform, keyword, tabId) {
+  if (platform === "shopee") {
+    L("ยิง Shopee ผ่าน MAIN world, tab", tabId);
+    return await scrapeShopeeMainWorld(tabId, keyword, CONFIG.MAX_ITEMS);
+  }
+  L("ส่ง SCRAPE_ONE_ADHOC ไปแท็บ", tabId);
+  const resp = await chrome.tabs.sendMessage(tabId, { type: "SCRAPE_ONE_ADHOC", keyword });
+  if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
+  return resp.items || [];
+}
+
+// realtime: หาแท็บอุ่น/เปิดใหม่ + navigate + ดึงผ่าน scrapePlatform (คืน items)
 async function scrapeAdhoc(platform, keyword) {
   const make = PLATFORM_SEARCH[platform] || PLATFORM_SEARCH.shopee;
   const host = PLATFORM_HOST[platform] || PLATFORM_HOST.shopee;
 
-  // หาแท็บ platform ที่เปิดอยู่ (ครอบทั้ง host ตรง ๆ และ subdomain)
   const existing = [
     ...(await chrome.tabs.query({ url: `*://${host}/*` })),
     ...(await chrome.tabs.query({ url: `*://*.${host}/*` })),
@@ -250,35 +266,50 @@ async function scrapeAdhoc(platform, keyword) {
   const warmTab = existing.find((t) => t.id != null);
   L("หาแท็บ", host, "ที่เปิดอยู่:", existing.length, "แท็บ", warmTab ? `(ใช้ tab ${warmTab.id})` : "(ไม่มี — จะเปิดใหม่)");
 
-  // ดึงจากแท็บ: Shopee ใช้ main-world (กัน 403) · platform อื่นใช้ content message (DOM)
-  const pull = async (tabId) => {
-    if (platform === "shopee") {
-      L("ยิง Shopee ผ่าน MAIN world, tab", tabId);
-      return await scrapeShopeeMainWorld(tabId, keyword, CONFIG.MAX_ITEMS);
-    }
-    L("ส่ง SCRAPE_ONE_ADHOC ไปแท็บ", tabId);
-    const resp = await chrome.tabs.sendMessage(tabId, { type: "SCRAPE_ONE_ADHOC", keyword });
-    if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
-    return resp.items || [];
-  };
-
   if (warmTab) {
     L("นำแท็บอุ่นไปหน้า search:", make(keyword));
     await navigateTab(warmTab.id, make(keyword));
     await new Promise((r) => setTimeout(r, platform === "shopee" ? 2500 : 4000));
-    return await pull(warmTab.id);
+    return await scrapePlatform(platform, keyword, warmTab.id);
   }
 
-  // ไม่มีแท็บเดิม → เปิดใหม่ (โอกาสเจอ CAPTCHA สูงกว่า)
   L("เปิดแท็บใหม่ (active):", make(keyword));
   const tab = await chrome.tabs.create({ url: make(keyword), active: true });
   try {
     await waitForTabComplete(tab.id);
     await new Promise((r) => setTimeout(r, platform === "shopee" ? 6000 : 5000));
-    return await pull(tab.id);
+    return await scrapePlatform(platform, keyword, tab.id);
   } finally {
     setTimeout(() => chrome.tabs.remove(tab.id).catch(() => {}), 1000);
   }
+}
+
+// ดึงชื่อร้านเรา (ต่อ platform) จากเว็บ — ใช้ตอน ingest ที่ background
+async function fetchShops() {
+  try {
+    return await (await fetch(apiBase() + "/api/settings")).json();
+  } catch {
+    return {};
+  }
+}
+
+// ส่ง items เข้า DB ถาวร (auto + realtime cache) — background ingest แทน content
+// keyword ใหม่จะได้ is_tracked=false (default) — favorite ค่อย set true
+async function ingestItems(keyword, items, shops) {
+  const res = await fetch(apiBase() + "/api/ingest", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: authHeader },
+    body: JSON.stringify({
+      keyword,
+      label: keyword,
+      myShopShopee: shops?.myShopShopee ?? null,
+      myShopTiktok: shops?.myShopTiktok ?? null,
+      myShopLazada: shops?.myShopLazada ?? null,
+      items,
+    }),
+  });
+  if (!res.ok) throw new Error("ingest HTTP " + res.status);
+  return res.json();
 }
 
 async function postJobResult(jobId, payload) {
@@ -327,9 +358,10 @@ async function fetchKeywords() {
 // วนทุก platform ที่เปิด × ทุก keyword: นำแท็บไปหน้า search แล้วสั่ง content ดึงทีละคำ
 // (พาไปหน้า search จริงสำคัญมากสำหรับ DOM fallback ของ tiktok/lazada)
 async function runScrape() {
-  const [platforms, keywords] = await Promise.all([
+  const [platforms, keywords, shops] = await Promise.all([
     enabledPlatforms(),
     fetchKeywords(),
+    fetchShops(),
   ]);
   if (keywords.length === 0) {
     return { ok: false, error: "ยังไม่มี keyword — เพิ่มในหน้าตั้งค่าบนเว็บก่อน" };
@@ -353,17 +385,12 @@ async function runScrape() {
       for (const kw of keywords) {
         try {
           await navigateTab(tab.id, PLATFORM_SEARCH[platform](kw));
-          // รอ DOM/หน้าโหลด + content script พร้อม (tiktok/lazada โหลดช้ากว่า)
+          // รอ DOM/หน้าโหลด + token (tiktok/lazada โหลดช้ากว่า)
           await new Promise((r) => setTimeout(r, platform === "shopee" ? 1500 : 3500));
-          const resp = await chrome.tabs.sendMessage(tab.id, {
-            type: "SCRAPE_ONE",
-            keyword: kw,
-          });
-          allResults.push(
-            resp?.ok
-              ? { platform, keyword: kw, sent: resp.result?.sent ?? 0 }
-              : { platform, keyword: kw, error: resp?.error || "ไม่ทราบสาเหตุ" },
-          );
+          // ดึงผ่าน shared scrapePlatform (Shopee = main-world, ไม่ 403) แล้ว ingest จาก background
+          const items = await scrapePlatform(platform, kw, tab.id);
+          await ingestItems(kw, items, shops);
+          allResults.push({ platform, keyword: kw, sent: items.length });
         } catch (e) {
           allResults.push({ platform, keyword: kw, error: String(e.message || e) });
         }

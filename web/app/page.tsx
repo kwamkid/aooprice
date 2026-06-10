@@ -61,6 +61,7 @@ async function getKeywords(): Promise<KwCard[]> {
           ) THEN r.rnk END)::int AS my_rank
     FROM keywords k
     LEFT JOIN ranked r ON r.keyword_id = k.id
+    WHERE k.is_tracked = true
     GROUP BY k.id, k.keyword, k.label, k.my_shop,
              k.my_shop_shopee, k.my_shop_tiktok, k.my_shop_lazada
     ORDER BY k.id

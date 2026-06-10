@@ -189,21 +189,37 @@ export function SearchClient({ shopFilter }: { shopFilter?: boolean }) {
     stopPolling();
     setState({ kind: "waiting", keyword });
 
+    // กรองชื่อร้าน (ถ้ากรอก) + แสดงผล
+    const showRows = (items: AdhocItem[], platform: string) => {
+      let rows = toRows(items, platform);
+      const s = shop.trim().toLowerCase();
+      if (s) rows = rows.filter((r) => (r.shop_name || "").toLowerCase().includes(s));
+      setState({ kind: "done", keyword, rows });
+    };
+
+    // 1) ยิง /api/search — cache-aware (HIT คืนเลย, MISS สร้าง job)
     let jobId: string;
     try {
-      const res = await fetch("/api/search-job", {
+      const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ keyword }),
       });
       const json = await res.json();
-      if (!res.ok || !json.jobId) throw new Error(json.error || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      if (json.cached) {
+        // ใช้ข้อมูลจาก DB (ภายใน 6 ชม.) — ไม่ต้องยิง extension
+        showRows((json.items as AdhocItem[]) || [], "shopee");
+        return;
+      }
+      if (!json.jobId) throw new Error("no jobId");
       jobId = json.jobId;
     } catch (e) {
       setState({ kind: "error", message: `สร้างคำค้นไม่สำเร็จ: ${e instanceof Error ? e.message : ""}` });
       return;
     }
 
+    // 2) poll job — เมื่อ done = extension ingest เข้า DB แล้ว → ดึงจาก /api/compare (แหล่งเดียว)
     const startedAt = Date.now();
     const poll = async () => {
       try {
@@ -211,10 +227,13 @@ export function SearchClient({ shopFilter }: { shopFilter?: boolean }) {
         const { job } = await res.json();
         if (job?.status === "done") {
           stopPolling();
-          let rows = toRows((job.result as AdhocItem[]) || [], job.platform || "shopee");
-          const s = shop.trim().toLowerCase();
-          if (s) rows = rows.filter((r) => (r.shop_name || "").toLowerCase().includes(s));
-          setState({ kind: "done", keyword, rows });
+          try {
+            const cmp = await fetch(`/api/compare?keyword=${encodeURIComponent(keyword)}`);
+            const cj = await cmp.json();
+            showRows((cj.items as AdhocItem[]) || [], "shopee");
+          } catch {
+            setState({ kind: "error", message: "ดึงผลจากฐานข้อมูลไม่สำเร็จ" });
+          }
           return;
         }
         if (job?.status === "error") {
