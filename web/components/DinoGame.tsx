@@ -16,7 +16,7 @@ export function DinoGame() {
     vy: 0, // ความเร็วแนวตั้ง
     onGround: true,
     obstacles: [] as { x: number; w: number; h: number }[],
-    speed: 3,
+    speed: 2,
     tick: 0,
     score: 0,
     running: true,
@@ -28,15 +28,21 @@ export function DinoGame() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!; // canvas รองรับ 2d เสมอ (กัน TS null ใน closure)
 
+    // โหลดรูป dino/cactus (SVG ใน public/dinorun) — วาดด้วย drawImage
+    const dinoImg = new Image();
+    dinoImg.src = "/dinorun/dino.svg";
+    const cactusImg = new Image();
+    cactusImg.src = "/dinorun/cactus1.svg";
+
     const W = canvas.width;
     const H = canvas.height;
     const GROUND = H - 20; // เส้นพื้น
     const DINO_X = 40;
-    const DINO_W = 26;
-    const DINO_H = 28;
-    const GRAVITY = 0.55;
-    const JUMP_V = -10;
-    const START_SPEED = 3; // ช้าลงจากเดิม (5) — เล่นง่ายขึ้น
+    const DINO_W = 40; // รูป dino 1:1
+    const DINO_H = 40;
+    const GRAVITY = 0.45; // นุ่มขึ้น (กระโดดไม่ไว/ไม่สูงเกิน)
+    const JUMP_V = -9;
+    const START_SPEED = 2; // เริ่มช้ามาก แล้วค่อย ๆ ไวขึ้น
 
     const g = game.current;
     // reset
@@ -84,8 +90,8 @@ export function DinoGame() {
     canvas.addEventListener("pointerdown", jump);
 
     function spawnObstacle() {
-      const h = 16 + Math.floor((g.tick % 3) * 6); // สูงสลับ ๆ ตาม tick
-      g.obstacles.push({ x: W, w: 12, h });
+      const h = 26 + (g.tick % 2) * 8; // 26 หรือ 34 — กระโดดข้ามได้ทั้งคู่
+      g.obstacles.push({ x: W, w: h, h }); // cactus เป็นรูป 1:1
     }
 
     function loop() {
@@ -105,15 +111,19 @@ export function DinoGame() {
       const gap = Math.max(60, 110 - Math.floor(g.score / 200));
       if (g.tick % gap === 0) spawnObstacle();
 
-      // เลื่อน + ลบที่พ้นจอ + เช็คชน
-      const dinoTop = GROUND - DINO_H + g.dinoY;
-      const dinoBottom = GROUND + g.dinoY;
+      // เลื่อน + ลบที่พ้นจอ + เช็คชน (hitbox แคบกว่ารูปจริง ~ padding ใน SVG = แฟร์ขึ้น)
+      const PAD = 6; // กันชนรูปที่มีขอบใส
+      const dinoL = DINO_X + PAD;
+      const dinoR = DINO_X + DINO_W - PAD;
+      const dinoFoot = GROUND + g.dinoY; // เท้าไดโน
       for (const o of g.obstacles) o.x -= g.speed;
       g.obstacles = g.obstacles.filter((o) => o.x + o.w > 0);
       for (const o of g.obstacles) {
-        const hitX = DINO_X + DINO_W > o.x && DINO_X < o.x + o.w;
-        const hitY = dinoBottom > GROUND - o.h;
-        if (hitX && hitY && dinoTop < GROUND) {
+        const oL = o.x + PAD;
+        const oR = o.x + o.w - PAD;
+        const hitX = dinoR > oL && dinoL < oR;
+        const hitY = dinoFoot > GROUND - o.h + 4; // เท้าต่ำกว่ายอดกระบองเพชร = ชน
+        if (hitX && hitY) {
           g.running = false;
           setOver(true);
           setBest((b) => Math.max(b, Math.floor(g.score / 10)));
@@ -121,50 +131,42 @@ export function DinoGame() {
         }
       }
 
-      // คะแนน + เร่งความเร็ว
+      // คะแนน + เร่งความเร็วแบบค่อย ๆ ลื่น (ramp ตาม score, ไม่กระโดดเป็น step)
       g.score++;
-      if (g.score % 800 === 0) g.speed += 0.3;
+      g.speed = START_SPEED + g.score / 1200; // 2.0 → ค่อย ๆ ไวขึ้นเรื่อย ๆ
+      if (g.speed > 7) g.speed = 7; // เพดานกันเร็วเกินเล่นไม่ได้
       if (g.score % 5 === 0) setScore(Math.floor(g.score / 10));
 
       // ---- วาด ----
-      ctx.clearRect(0, 0, W, H);
+      // พื้นหลังอ่อน (ไดโนเป็นรูปสีดำ — ต้องมีพื้นสว่างถึงจะเห็น เหมือน Dino จริงของ Chrome)
+      ctx.fillStyle = "#f1f3f5";
+      ctx.fillRect(0, 0, W, H);
       // พื้น
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
       ctx.beginPath();
       ctx.moveTo(0, GROUND);
       ctx.lineTo(W, GROUND);
       ctx.stroke();
 
-      // ---- ไดโน (รูปทรงคล้าย T-Rex สีส้มแบรนด์) ----
+      // ---- ไดโน (รูป SVG) ----
       const dy = GROUND + g.dinoY; // ระดับเท้าไดโน ณ ตอนนี้
-      ctx.fillStyle = "#f47527";
-      // ลำตัว
-      ctx.fillRect(DINO_X, dy - 18, 14, 14);
-      // หาง (ชี้ไปข้างหลัง)
-      ctx.fillRect(DINO_X - 6, dy - 14, 6, 5);
-      // คอ + หัว (ชูขึ้นด้านหน้า)
-      ctx.fillRect(DINO_X + 10, dy - 26, 8, 10);
-      ctx.fillRect(DINO_X + 14, dy - 28, 12, 12); // หัว
-      // ปาก
-      ctx.fillRect(DINO_X + 26, dy - 22, 4, 4);
-      // ตา (ขาว)
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(DINO_X + 22, dy - 26, 3, 3);
-      // ขา — สลับซ้าย/ขวาให้เหมือนวิ่ง (เฉพาะตอนอยู่บนพื้น)
-      ctx.fillStyle = "#f47527";
-      const stride = g.onGround && Math.floor(g.tick / 6) % 2 === 0;
-      ctx.fillRect(DINO_X + 2, dy - 4, 4, stride ? 4 : 2);
-      ctx.fillRect(DINO_X + 9, dy - 4, 4, stride ? 2 : 4);
-      // แขนเล็ก
-      ctx.fillRect(DINO_X + 12, dy - 14, 4, 3);
+      if (dinoImg.complete && dinoImg.naturalWidth) {
+        ctx.drawImage(dinoImg, DINO_X, dy - DINO_H, DINO_W, DINO_H);
+      } else {
+        // fallback ถ้ารูปยังโหลดไม่เสร็จ
+        ctx.fillStyle = "#f47527";
+        ctx.fillRect(DINO_X, dy - DINO_H, DINO_W, DINO_H);
+      }
 
-      // ---- กระบองเพชร (มีแขนข้าง ๆ) ----
-      ctx.fillStyle = "#7bd88f";
+      // ---- กระบองเพชร (รูป SVG) ----
       for (const o of g.obstacles) {
         const top = GROUND - o.h;
-        ctx.fillRect(o.x + 3, top, 6, o.h); // ลำต้น
-        ctx.fillRect(o.x, top + o.h * 0.35, 3, o.h * 0.3); // แขนซ้าย
-        ctx.fillRect(o.x + 9, top + o.h * 0.2, 3, o.h * 0.3); // แขนขวา
+        if (cactusImg.complete && cactusImg.naturalWidth) {
+          ctx.drawImage(cactusImg, o.x, top, o.w, o.h);
+        } else {
+          ctx.fillStyle = "#7bd88f";
+          ctx.fillRect(o.x, top, o.w, o.h);
+        }
       }
 
       g.raf = requestAnimationFrame(loop);
