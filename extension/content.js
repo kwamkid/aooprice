@@ -117,9 +117,16 @@
     }
     // ค้นสด (ad-hoc): ดึง keyword เดียวแล้วคืน items ตรง ๆ — ไม่ ingest เข้า DB ถาวร
     if (msg.type === "SCRAPE_ONE_ADHOC") {
+      console.log("[aooprice] content รับ SCRAPE_ONE_ADHOC:", msg.keyword, "@", location.href);
       fetchItems(msg.keyword, { maxItems: CONFIG.MAX_ITEMS })
-        .then((items) => sendResponse({ ok: true, items }))
-        .catch((e) => sendResponse({ ok: false, error: String(e.message || e) }));
+        .then((items) => {
+          console.log("[aooprice] content ดึงได้", items.length, "items → ส่งกลับ background");
+          sendResponse({ ok: true, items });
+        })
+        .catch((e) => {
+          console.warn("[aooprice] content ดึงล้ม:", String(e.message || e));
+          sendResponse({ ok: false, error: String(e.message || e) });
+        });
       return true;
     }
   });

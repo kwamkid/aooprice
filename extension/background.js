@@ -101,6 +101,9 @@ function startFastPoll() {
   tick();
 }
 
+// log helper — ใส่ prefix [aooprice] ให้ค้นใน console ง่าย (service worker console)
+const L = (...a) => console.log("[aooprice]", ...a);
+
 // claim job ค้นสด 1 อันจากเว็บ → ยิง marketplace สด → ส่งผลกลับ (ไม่เข้า DB ถาวร)
 async function pollSearchJob() {
   let job;
@@ -108,17 +111,24 @@ async function pollSearchJob() {
     const res = await fetch(apiBase() + "/api/search-job?claim=1", {
       headers: { authorization: authHeader },
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      L("claim: HTTP", res.status, "(ไม่ใช่ 200 — ข้าม)");
+      return;
+    }
     job = (await res.json()).job;
-  } catch {
-    return; // เว็บปิด/ออฟไลน์
+  } catch (e) {
+    L("claim: fetch ล้ม (เว็บปิด/ออฟไลน์?)", String(e.message || e));
+    return;
   }
-  if (!job) return; // ไม่มีคิว
+  if (!job) return; // ไม่มีคิว (เงียบไว้ — poll ทุก 5 วิ)
 
+  L("🎯 claim job:", job.id, "| keyword:", job.keyword, "| platform:", job.platform);
   try {
     const items = await scrapeAdhoc(job.platform || "shopee", job.keyword);
+    L("✅ ดึงได้", items.length, "รายการ → ส่งผลกลับ");
     await postJobResult(job.id, { items });
   } catch (e) {
+    L("❌ ดึงล้ม:", String(e.message || e), "→ ส่ง error กลับ");
     await postJobResult(job.id, { error: String(e.message || e) });
   }
 }
@@ -143,28 +153,34 @@ async function scrapeAdhoc(platform, keyword) {
     ...(await chrome.tabs.query({ url: `*://*.${host}/*` })),
   ];
   const warmTab = existing.find((t) => t.id != null);
+  L("หาแท็บ", host, "ที่เปิดอยู่:", existing.length, "แท็บ", warmTab ? `(ใช้ tab ${warmTab.id})` : "(ไม่มี — จะเปิดใหม่)");
 
   if (warmTab) {
-    // นำแท็บอุ่นที่มีอยู่ไปหน้า search ของ keyword นี้ แล้วดึง (ไม่ปิดแท็บ — เป็นของ user)
+    L("นำแท็บอุ่นไปหน้า search:", make(keyword));
     await navigateTab(warmTab.id, make(keyword));
     await new Promise((r) => setTimeout(r, platform === "shopee" ? 2500 : 4000));
+    L("ส่ง SCRAPE_ONE_ADHOC ไปแท็บ", warmTab.id);
     const resp = await chrome.tabs.sendMessage(warmTab.id, {
       type: "SCRAPE_ONE_ADHOC",
       keyword,
     });
+    L("ได้ตอบจาก content:", resp?.ok ? `ok, ${resp.items?.length ?? 0} items` : `FAIL: ${resp?.error}`);
     if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
     return resp.items || [];
   }
 
   // ไม่มีแท็บเดิม → เปิดใหม่ (โอกาสเจอ CAPTCHA สูงกว่า)
+  L("เปิดแท็บใหม่ (active):", make(keyword));
   const tab = await chrome.tabs.create({ url: make(keyword), active: true });
   try {
     await waitForTabComplete(tab.id);
     await new Promise((r) => setTimeout(r, platform === "shopee" ? 6000 : 5000));
+    L("ส่ง SCRAPE_ONE_ADHOC ไปแท็บใหม่", tab.id);
     const resp = await chrome.tabs.sendMessage(tab.id, {
       type: "SCRAPE_ONE_ADHOC",
       keyword,
     });
+    L("ได้ตอบจาก content (แท็บใหม่):", resp?.ok ? `ok, ${resp.items?.length ?? 0} items` : `FAIL: ${resp?.error}`);
     if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
     return resp.items || [];
   } finally {

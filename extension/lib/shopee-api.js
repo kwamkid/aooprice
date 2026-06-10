@@ -36,10 +36,14 @@ export async function fetchShopeeItems(keyword, { maxItems = 60 } = {}) {
 
     // 403/429 = anti-bot/throttle — มักเป็นเพราะ session ยังไม่พร้อม
     // retry ได้ถึง 2 ครั้ง โดยรอนานขึ้นเรื่อย ๆ (ให้ Shopee เซ็ต token ครบ)
+    console.log("[aooprice] shopee fetch:", url);
     let res = await doFetch();
+    console.log("[aooprice] shopee HTTP", res.status, "(page", page, ")");
     for (let attempt = 1; attempt <= 2 && (res.status === 403 || res.status === 429); attempt++) {
+      console.log("[aooprice] retry", attempt, "เพราะ HTTP", res.status);
       await new Promise((r) => setTimeout(r, attempt * 2500));
       res = await doFetch();
+      console.log("[aooprice] retry", attempt, "→ HTTP", res.status);
     }
 
     // 403 มักแปลว่า Shopee ขอ CAPTCHA — บอก user ให้ไปยืนยันตัวตน (โค้ดยิงผ่านไม่ได้)
@@ -53,6 +57,7 @@ export async function fetchShopeeItems(keyword, { maxItems = 60 } = {}) {
     }
 
     const data = await res.json();
+    console.log("[aooprice] shopee body: error=", data?.error, "items=", (data?.items || []).length);
 
     // error: 90309999 = ต้องผ่าน CAPTCHA ก่อน (status ยังเป็น 200 แต่ body มี error นี้)
     if (data?.error === 90309999) {
