@@ -38,7 +38,7 @@ export function ImageZoom({
     return (
       <div
         className={cn(
-          "h-11 w-11 rounded-lg border border-[var(--border)] bg-white/5",
+          "h-11 w-11 rounded-lg border border-[var(--border)] bg-brand-50",
           className
         )}
       />
@@ -66,29 +66,29 @@ export function ImageZoom({
 
       {open && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-[100] grid h-screen w-screen place-items-center overflow-hidden bg-black/80 p-4 backdrop-blur-md animate-fade-in"
           onClick={() => setOpen(false)}
         >
           <button
             onClick={() => setOpen(false)}
-            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
+            className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-xl bg-white/15 text-white transition hover:bg-white/25"
             aria-label="ปิด"
           >
             <IconClose />
           </button>
 
           <figure
-            className="flex max-h-full max-w-3xl flex-col items-center gap-3"
+            className="flex max-h-[90vh] max-w-[90vw] flex-col items-center gap-3"
             onClick={(e) => e.stopPropagation()}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={src}
               alt={alt}
-              className="max-h-[78vh] w-auto rounded-2xl border border-white/10 object-contain shadow-soft"
+              className="min-h-0 max-h-[80vh] w-auto max-w-full rounded-2xl border border-white/10 object-contain shadow-soft"
             />
             {title && (
-              <figcaption className="max-w-full truncate text-center text-sm text-white/80">
+              <figcaption className="max-w-full shrink-0 truncate text-center text-sm text-white/80">
                 {title}
               </figcaption>
             )}
