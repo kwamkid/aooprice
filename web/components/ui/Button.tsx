@@ -6,9 +6,9 @@ const VARIANTS: Record<Variant, string> = {
   primary:
     "bg-gradient-brand text-white shadow-glow hover:opacity-95 active:opacity-90",
   ghost:
-    "border border-[var(--border)] bg-white/[0.03] text-white hover:bg-white/[0.07]",
+    "border border-[var(--border)] bg-white text-ink-900 hover:bg-brand-50",
   danger:
-    "border border-rose-500/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20",
+    "border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100",
 };
 
 export function Button({

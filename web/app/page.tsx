@@ -101,8 +101,8 @@ export default async function HomePage() {
 
       {dbError && (
         <EmptyState tone="danger" title="เชื่อมต่อฐานข้อมูลไม่ได้">
-          ตรวจ <code className="rounded bg-white/10 px-1">DATABASE_URL</code> ใน .env แล้วรัน{" "}
-          <code className="rounded bg-white/10 px-1">npm run db:push</code>
+          ตรวจ <code className="rounded bg-brand-100 px-1">DATABASE_URL</code> ใน .env แล้วรัน{" "}
+          <code className="rounded bg-brand-100 px-1">npm run db:push</code>
         </EmptyState>
       )}
 
@@ -136,7 +136,7 @@ export default async function HomePage() {
           {keywords.length === 0 ? (
             <EmptyState icon="🏷️" title="ยังไม่มี keyword">
               เพิ่มผ่าน Extension หรือรัน{" "}
-              <code className="rounded bg-white/10 px-1">npm run db:seed</code>{" "}
+              <code className="rounded bg-brand-100 px-1">npm run db:seed</code>{" "}
               เพื่อใส่ข้อมูลตัวอย่าง
             </EmptyState>
           ) : (
@@ -173,17 +173,17 @@ export default async function HomePage() {
                       k.lazada_count > 0) && (
                       <div className="muted mt-3 flex flex-wrap gap-x-2 gap-y-1 text-xs">
                         {k.shopee_count > 0 && (
-                          <span className="text-orange-300">
+                          <span className="text-orange-600">
                             Shopee {k.shopee_count}
                           </span>
                         )}
                         {k.tiktok_count > 0 && (
-                          <span className="text-pink-200">
+                          <span className="text-pink-600">
                             TikTok {k.tiktok_count}
                           </span>
                         )}
                         {k.lazada_count > 0 && (
-                          <span className="text-indigo-300">
+                          <span className="text-indigo-600">
                             Lazada {k.lazada_count}
                           </span>
                         )}

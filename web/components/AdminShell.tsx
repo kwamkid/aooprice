@@ -13,7 +13,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
       {/* ===== Sidebar (desktop) ===== */}
-      <aside className="sticky top-0 hidden h-screen flex-col gap-6 border-r border-[var(--border)] bg-ink-950/40 p-5 backdrop-blur-xl lg:flex">
+      <aside className="sticky top-0 hidden h-screen flex-col gap-6 border-r border-[var(--border)] bg-white/70 p-5 backdrop-blur-xl lg:flex">
         <Brand />
         <SidebarNav />
         <ExtensionHint />
@@ -38,7 +38,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         {/* panel */}
         <aside
           className={cn(
-            "absolute left-0 top-0 flex h-full w-[78%] max-w-[300px] flex-col gap-6 border-r border-[var(--border)] bg-ink-900 p-5 shadow-soft transition-transform duration-300",
+            "absolute left-0 top-0 flex h-full w-[78%] max-w-[300px] flex-col gap-6 border-r border-[var(--border)] bg-white p-5 shadow-soft transition-transform duration-300",
             open ? "translate-x-0" : "-translate-x-full"
           )}
         >
@@ -46,7 +46,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <Brand />
             <button
               onClick={() => setOpen(false)}
-              className="grid h-9 w-9 place-items-center rounded-lg text-[var(--muted)] hover:bg-white/5 hover:text-white"
+              className="grid h-9 w-9 place-items-center rounded-lg text-[var(--muted)] hover:bg-brand-50 hover:text-ink-900"
               aria-label="ปิดเมนู"
             >
               <IconClose />
@@ -60,10 +60,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       {/* ===== Content column ===== */}
       <div className="flex min-h-screen min-w-0 flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--border)] bg-ink-900/70 px-4 py-3 backdrop-blur-xl lg:px-8">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--border)] bg-white/80 px-4 py-3 backdrop-blur-xl lg:px-8">
           <button
             onClick={() => setOpen(true)}
-            className="grid h-9 w-9 place-items-center rounded-lg text-[var(--muted)] hover:bg-white/5 hover:text-white lg:hidden"
+            className="grid h-9 w-9 place-items-center rounded-lg text-[var(--muted)] hover:bg-brand-50 hover:text-ink-900 lg:hidden"
             aria-label="เปิดเมนู"
           >
             <IconMenu />

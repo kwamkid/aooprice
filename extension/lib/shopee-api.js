@@ -99,6 +99,7 @@ function mapItem(b) {
       : null,
     productUrl: `https://shopee.co.th/product/${b.shopid}/${b.itemid}`,
     price: toBaht(b.price ?? b.price_min),
+    priceBefore: toBaht(b.price_before_discount ?? b.price_max_before_discount), // ราคาตั้ง (ก่อนลด)
     sold: b.historical_sold ?? b.sold ?? null,
     rating:
       rating.rating_star != null

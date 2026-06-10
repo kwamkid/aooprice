@@ -71,7 +71,8 @@ export const snapshots = pgTable(
     productId: integer("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
-    price: numeric("price", { precision: 12, scale: 2 }), // บาท
+    price: numeric("price", { precision: 12, scale: 2 }), // บาท (ราคาขายจริง)
+    priceBefore: numeric("price_before", { precision: 12, scale: 2 }), // ราคาตั้งก่อนลด
     sold: integer("sold"), // ขายแล้ว (historical_sold)
     rating: numeric("rating", { precision: 2, scale: 1 }), // เรตติ้งเฉลี่ย
     ratingCount: integer("rating_count"),

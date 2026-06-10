@@ -18,6 +18,7 @@ type AdhocItem = {
   imageUrl?: string | null;
   productUrl?: string | null;
   price?: number | null;
+  priceBefore?: number | null;
   sold?: number | null;
   rating?: number | null;
   ratingCount?: number | null;
@@ -35,6 +36,7 @@ function toRows(items: AdhocItem[], platform: string): CompareRow[] {
       image_url: it.imageUrl ?? null,
       product_url: it.productUrl ?? null,
       price: it.price ?? null,
+      price_before: it.priceBefore ?? null,
       sold: it.sold ?? null,
       rating: it.rating ?? null,
       rating_count: it.ratingCount ?? null,
@@ -247,14 +249,31 @@ export function SearchClient({ shopFilter }: { shopFilter?: boolean }) {
         </EmptyState>
       )}
 
-      {state.kind === "done" &&
-        (state.rows.length === 0 ? (
-          <EmptyState icon="🔍" title={`ไม่พบสินค้าสำหรับ "${state.keyword}"`}>
-            ลองคำค้นอื่น หรือเอาตัวกรองชื่อร้านออก
-          </EmptyState>
-        ) : (
-          <CompareTable rows={state.rows} myShopByPlatform={{}} />
-        ))}
+      {state.kind === "done" && (
+        <>
+          {/* ลิงก์ไปหน้า search จริงบน Shopee ของคำค้นนี้ */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="muted">
+              ผลค้น &quot;{state.keyword}&quot; · {state.rows.length} รายการ
+            </span>
+            <a
+              href={`https://shopee.co.th/search?keyword=${encodeURIComponent(state.keyword)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-brand-700 underline-offset-2 hover:underline"
+            >
+              เปิดบน Shopee ↗
+            </a>
+          </div>
+          {state.rows.length === 0 ? (
+            <EmptyState icon="🔍" title={`ไม่พบสินค้าสำหรับ "${state.keyword}"`}>
+              ลองคำค้นอื่น หรือเอาตัวกรองชื่อร้านออก
+            </EmptyState>
+          ) : (
+            <CompareTable rows={state.rows} myShopByPlatform={{}} />
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -124,21 +124,21 @@ export default function SettingsPage() {
             subtitle="ไว้ไฮไลต์ร้านเราในตารางเทียบราคา (ชื่อร้านแต่ละ platform มักไม่เหมือนกัน)"
           />
           <CardBody>
-            <label className="muted mb-1 block text-xs text-orange-300">Shopee</label>
+            <label className="muted mb-1 block text-xs text-orange-600">Shopee</label>
             <input
               className="input-field"
               placeholder="เช่น pungklombabyshop"
               value={myShopShopee}
               onChange={(e) => setMyShopShopee(e.target.value)}
             />
-            <label className="muted mb-1 mt-3 block text-xs text-pink-200">TikTok Shop</label>
+            <label className="muted mb-1 mt-3 block text-xs text-pink-600">TikTok Shop</label>
             <input
               className="input-field"
               placeholder="เช่น pungklom.official"
               value={myShopTiktok}
               onChange={(e) => setMyShopTiktok(e.target.value)}
             />
-            <label className="muted mb-1 mt-3 block text-xs text-indigo-300">Lazada</label>
+            <label className="muted mb-1 mt-3 block text-xs text-indigo-600">Lazada</label>
             <input
               className="input-field"
               placeholder="เช่น Pungklom Official Store"
@@ -189,11 +189,11 @@ export default function SettingsPage() {
                 {keywords.map((k) => (
                   <li
                     key={k.id}
-                    className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-white/[0.02] p-3"
+                    className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-brand-50/60 p-3"
                   >
                     <div className="min-w-0 flex-1">
                       <input
-                        className="w-full bg-transparent text-sm font-medium text-white outline-none focus:text-brand-200"
+                        className="w-full bg-transparent text-sm font-medium text-ink-900 outline-none focus:text-brand-700"
                         defaultValue={k.label ?? k.keyword}
                         onBlur={(e) => saveLabel(k.id, e.target.value)}
                         title="แก้ชื่อแสดงผลแล้วคลิกที่อื่นเพื่อบันทึก"
@@ -219,12 +219,12 @@ export default function SettingsPage() {
       <Card className="mt-6 p-5 text-sm leading-relaxed">
         <div className="mb-1 font-semibold">การดึงข้อมูลทำงานยังไง?</div>
         <p className="muted">
-          ปุ่ม “ดึงเดี๋ยวนี้” จะ <span className="text-brand-200">ส่งคำสั่งผ่านเว็บ</span>{" "}
+          ปุ่ม “ดึงเดี๋ยวนี้” จะ <span className="text-brand-700">ส่งคำสั่งผ่านเว็บ</span>{" "}
           แล้ว Chrome Extension ที่เปิดอยู่จะมารับไปทำงาน (ดึงราคาจาก Shopee ด้วย
           session ของคุณ แล้วส่งกลับเข้าระบบ) — เพราะ Shopee บล็อกการดึงจากเซิร์ฟเวอร์
           โดยตรง จึงต้องให้เบราว์เซอร์ที่ล็อกอินอยู่เป็นคนดึง
           <br />
-          <span className="text-amber-300">
+          <span className="text-amber-700">
             เงื่อนไข: ต้องเปิด Chrome ที่ติดตั้ง Extension ไว้ และล็อกอิน Shopee อยู่
           </span>
         </p>

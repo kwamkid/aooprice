@@ -20,7 +20,7 @@ async function getData(id: number) {
   const rows = (await sql`
     SELECT
       p.id AS product_id, p.platform, p.shop_name, p.title, p.image_url, p.product_url,
-      s.price, s.sold, s.rating, s.rating_count, s.is_official, s.captured_at
+      s.price, s.price_before, s.sold, s.rating, s.rating_count, s.is_official, s.captured_at
     FROM products p
     JOIN LATERAL (
       SELECT * FROM snapshots s2 WHERE s2.product_id = p.id
@@ -71,7 +71,7 @@ export default async function KeywordPage({
     <div>
       <Link
         href="/"
-        className="muted mb-2 inline-flex items-center gap-1 text-sm transition hover:text-white"
+        className="muted mb-2 inline-flex items-center gap-1 text-sm transition hover:text-ink-900"
       >
         ← กลับหน้าภาพรวม
       </Link>

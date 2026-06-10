@@ -20,7 +20,7 @@ export function EmptyState({
         "rounded-2xl border border-dashed p-10 text-center",
         tone === "danger"
           ? "border-rose-500/30 bg-rose-500/5 text-rose-200"
-          : "border-[var(--border)] bg-white/[0.02] text-[var(--muted)]",
+          : "border-[var(--border)] bg-brand-50/60 text-[var(--muted)]",
         className
       )}
     >

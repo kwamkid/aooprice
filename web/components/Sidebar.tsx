@@ -33,7 +33,7 @@ export function Brand() {
       </span>
       <span className="text-lg font-bold tracking-tight">
         <span className="gradient-text">aoo</span>
-        <span className="text-white/90">price</span>
+        <span className="text-ink-900">price</span>
       </span>
     </Link>
   );
@@ -59,8 +59,8 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             className={cn(
               "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
               active
-                ? "bg-gradient-card text-white shadow-glow"
-                : "text-[var(--muted)] hover:bg-white/[0.04] hover:text-white"
+                ? "bg-brand-50 text-brand-700 shadow-glow"
+                : "text-[var(--muted)] hover:bg-brand-50/70 hover:text-ink-900"
             )}
           >
             {active && (
@@ -69,7 +69,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             <Icon
               className={cn(
                 "shrink-0 transition",
-                active ? "text-brand-300" : "text-[var(--muted)] group-hover:text-white"
+                active ? "text-brand-600" : "text-[var(--muted)] group-hover:text-ink-900"
               )}
             />
             <span className="truncate">{item.label}</span>
@@ -85,7 +85,7 @@ export function ExtensionHint() {
   return (
     <div className="card mt-auto p-4">
       <div className="flex items-center gap-2 text-sm font-medium">
-        <IconRefresh width={16} height={16} className="text-brand-300" />
+        <IconRefresh width={16} height={16} className="text-brand-600" />
         ดึงผ่าน Extension
       </div>
       <p className="muted mt-1.5 text-xs leading-relaxed">

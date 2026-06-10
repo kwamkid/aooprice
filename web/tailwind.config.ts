@@ -11,44 +11,46 @@ export default {
         sans: ["var(--font-plex-thai)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       colors: {
-        // โทนพื้นหลังดำ-ม่วง (ไล่จากเข้มสุด → อ่อน)
+        // light theme: ink = นิวทรัลอุ่น (เข้ม=ข้อความ, อ่อน=พื้น/การ์ด)
+        // 950/900/850 = ข้อความ, 800 = muted, 700 = เส้นขอบ, 600 = พื้นการ์ดอ่อน
         ink: {
-          950: "#0a0612",
-          900: "#0f0a1e",
-          850: "#150f2b",
-          800: "#1b1338",
-          700: "#241a4d",
-          600: "#2f2363",
+          950: "#1c1410",
+          900: "#2a2018",
+          850: "#3d3228",
+          800: "#6b5d4f",
+          700: "#e7ddd2",
+          600: "#f0e8de",
         },
         brand: {
-          50: "#f4f0ff",
-          100: "#e9e0ff",
-          200: "#d4c2ff",
-          300: "#b69bff",
-          400: "#9168ff",
-          500: "#7c3aed", // ม่วงหลัก
-          600: "#6d28d9",
-          700: "#5b21b6",
-          800: "#4c1d95",
-          900: "#3b0d7a",
+          // ส้มโลโก้ #f47527 เป็นแกน
+          50: "#fff4ec",
+          100: "#ffe6d5",
+          200: "#fdc9a8",
+          300: "#fba772",
+          400: "#f88c46",
+          500: "#f47527", // ส้มหลัก (= โลโก้)
+          600: "#e25e16",
+          700: "#bb4712",
+          800: "#943917",
+          900: "#783116",
         },
         accent: {
-          // ฟ้า-ม่วง futuristic (ไว้ทำ gradient คู่กับ brand)
-          400: "#22d3ee",
-          500: "#06b6d4",
-          600: "#0891b2",
+          // อำพัน/เหลืองทอง — warm คู่กับส้ม
+          400: "#fbbf24",
+          500: "#f59e0b",
+          600: "#d97706",
         },
       },
       backgroundImage: {
-        "gradient-brand": "linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)",
-        "gradient-ink": "linear-gradient(160deg, #0f0a1e 0%, #150f2b 55%, #1b1338 100%)",
+        "gradient-brand": "linear-gradient(135deg, #f47527 0%, #f59e0b 100%)",
+        "gradient-ink": "linear-gradient(160deg, #fffaf4 0%, #fff4ec 55%, #ffe9d8 100%)",
         "gradient-card":
-          "linear-gradient(160deg, rgba(124,58,237,0.08) 0%, rgba(6,182,212,0.04) 100%)",
-        "gradient-text": "linear-gradient(135deg, #b69bff 0%, #22d3ee 100%)",
+          "linear-gradient(160deg, rgba(244,117,39,0.06) 0%, rgba(245,158,11,0.03) 100%)",
+        "gradient-text": "linear-gradient(135deg, #f47527 0%, #d97706 100%)",
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(124,58,237,0.25), 0 8px 30px -8px rgba(124,58,237,0.35)",
-        soft: "0 8px 30px -12px rgba(0,0,0,0.6)",
+        glow: "0 0 0 1px rgba(244,117,39,0.18), 0 8px 30px -10px rgba(244,117,39,0.30)",
+        soft: "0 8px 30px -14px rgba(120,49,22,0.18)",
       },
       borderRadius: {
         xl: "0.875rem",

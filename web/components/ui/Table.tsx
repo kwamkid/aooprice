@@ -19,7 +19,7 @@ export function Table({
 
 export function THead({ children }: { children: React.ReactNode }) {
   return (
-    <thead className="border-b border-[var(--border)] bg-white/[0.02] text-xs uppercase tracking-wide text-[var(--muted)]">
+    <thead className="border-b border-[var(--border)] bg-brand-50/60 text-xs uppercase tracking-wide text-[var(--muted)]">
       {children}
     </thead>
   );
@@ -52,7 +52,7 @@ export function TR({
         "border-b border-[var(--border)] transition last:border-0",
         highlight
           ? "bg-brand-500/10 hover:bg-brand-500/15"
-          : "hover:bg-white/[0.03]",
+          : "hover:bg-brand-50/60",
         className
       )}
     >

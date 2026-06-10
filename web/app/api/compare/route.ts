@@ -47,6 +47,7 @@ export async function GET(req: Request) {
       p.image_url,
       p.product_url,
       s.price,
+      s.price_before,
       s.sold,
       s.rating,
       s.rating_count,

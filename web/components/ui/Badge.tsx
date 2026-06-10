@@ -2,13 +2,14 @@ import { cn } from "@/lib/cn";
 
 type Tone = "brand" | "accent" | "success" | "warning" | "danger" | "muted";
 
+// light theme: พื้นจาง + ข้อความเข้ม (contrast ผ่าน AA)
 const TONES: Record<Tone, string> = {
-  brand: "bg-brand-500/15 text-brand-200 border-brand-400/30",
-  accent: "bg-accent-500/15 text-accent-400 border-accent-500/30",
-  success: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  warning: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  danger: "bg-rose-500/15 text-rose-300 border-rose-500/30",
-  muted: "bg-white/5 text-[var(--muted)] border-[var(--border)]",
+  brand: "bg-brand-50 text-brand-700 border-brand-200",
+  accent: "bg-amber-50 text-amber-700 border-amber-200",
+  success: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  warning: "bg-amber-50 text-amber-700 border-amber-200",
+  danger: "bg-rose-50 text-rose-700 border-rose-200",
+  muted: "bg-ink-600 text-ink-800 border-[var(--border)]",
 };
 
 export function Badge({

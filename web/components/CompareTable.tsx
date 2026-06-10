@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { PlatformBadge, platformLabel } from "@/components/ui/PlatformBadge";
-import { Table, THead, TH, TR, TD } from "@/components/ui/Table";
+import { Table, THead, TR, TD } from "@/components/ui/Table";
 import { ImageZoom } from "@/components/ui/ImageZoom";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconExternal } from "@/components/ui/icons";
@@ -16,6 +16,7 @@ export type CompareRow = {
   image_url: string | null;
   product_url: string | null;
   price: number | null;
+  price_before: number | null; // ราคาตั้ง (ก่อนลด) — null ถ้าไม่ลด
   sold: number | null;
   rating: number | null;
   rating_count: number | null;
@@ -26,6 +27,10 @@ function fmt(n: number | null) {
   return n == null ? "-" : Number(n).toLocaleString("th-TH");
 }
 
+// คอลัมน์ที่ sort ได้ — key ตรงกับฟิลด์ตัวเลขใน CompareRow
+type SortKey = "price" | "sold" | "rating";
+type SortDir = "asc" | "desc";
+
 export function CompareTable({
   rows,
   myShopByPlatform,
@@ -33,70 +38,114 @@ export function CompareTable({
   rows: CompareRow[];
   myShopByPlatform: Record<string, string | null>;
 }) {
-  // platform ที่มีจริงในผลลัพธ์ (ไว้ทำปุ่ม filter)
+  const [active, setActive] = useState<string | "all">("all");
+  const [query, setQuery] = useState("");
+  // เริ่มเรียงราคาถูก→แพง (ตรงกับพฤติกรรมเดิม)
+  const [sortKey, setSortKey] = useState<SortKey>("price");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
   const platforms = useMemo(() => {
     const set = new Set(rows.map((r) => r.platform));
     return Array.from(set);
   }, [rows]);
-
-  const [active, setActive] = useState<string | "all">("all");
-
-  const filtered = active === "all" ? rows : rows.filter((r) => r.platform === active);
-  // ราคาต่ำสุดคำนวณจากชุดที่กำลังแสดง (เทียบในมุมที่ผู้ใช้เลือก)
-  const minPrice = filtered.reduce<number | null>(
-    (m, r) => (r.price != null && (m == null || r.price < m) ? r.price : m),
-    null,
-  );
 
   function isMine(r: CompareRow) {
     const mine = myShopByPlatform[r.platform];
     return !!(mine && r.shop_name && r.shop_name === mine);
   }
 
+  // คลิก header: ถ้า key เดิม → สลับทิศ, ถ้า key ใหม่ → ตั้ง default (ราคา asc, ที่เหลือ desc)
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "price" ? "asc" : "desc");
+    }
+  }
+
+  const view = useMemo(() => {
+    let v = active === "all" ? rows : rows.filter((r) => r.platform === active);
+    const q = query.trim().toLowerCase();
+    if (q) {
+      v = v.filter(
+        (r) =>
+          (r.title || "").toLowerCase().includes(q) ||
+          (r.shop_name || "").toLowerCase().includes(q),
+      );
+    }
+    // เรียงตาม sortKey/sortDir — ค่า null ไปท้ายเสมอ
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...v].sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * dir;
+    });
+  }, [rows, active, query, sortKey, sortDir]);
+
+  // ราคาต่ำสุดของชุดที่แสดง (มาร์ค "ถูกสุด")
+  const minPrice = view.reduce<number | null>(
+    (m, r) => (r.price != null && (m == null || r.price < m) ? r.price : m),
+    null,
+  );
+
   return (
     <div>
-      {/* filter platform */}
-      {platforms.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          <FilterChip
-            label={`ทั้งหมด (${rows.length})`}
-            active={active === "all"}
-            onClick={() => setActive("all")}
-          />
-          {platforms.map((p) => (
-            <FilterChip
-              key={p}
-              label={`${platformLabel(p)} (${rows.filter((r) => r.platform === p).length})`}
-              active={active === p}
-              onClick={() => setActive(p)}
-            />
-          ))}
+      {/* แถวควบคุม: filter platform + ช่องค้นในตาราง */}
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {platforms.length > 1 && (
+            <>
+              <FilterChip
+                label={`ทั้งหมด (${rows.length})`}
+                active={active === "all"}
+                onClick={() => setActive("all")}
+              />
+              {platforms.map((p) => (
+                <FilterChip
+                  key={p}
+                  label={`${platformLabel(p)} (${rows.filter((r) => r.platform === p).length})`}
+                  active={active === p}
+                  onClick={() => setActive(p)}
+                />
+              ))}
+            </>
+          )}
         </div>
-      )}
+        <input
+          className="input-field sm:w-64"
+          placeholder="ค้นในตาราง (ชื่อสินค้า/ร้าน)…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState icon="🛒" title="ยังไม่มีข้อมูล">
-          เปิด Extension แล้วกด “ดึงเดี๋ยวนี้”
+      {view.length === 0 ? (
+        <EmptyState icon="🛒" title={query ? "ไม่พบในตาราง" : "ยังไม่มีข้อมูล"}>
+          {query ? "ลองคำค้นอื่น" : "เปิด Extension แล้วกด “ดึงเดี๋ยวนี้”"}
         </EmptyState>
       ) : (
         <Table>
           <THead>
             <tr>
-              <TH className="w-10">#</TH>
-              <TH>ร้าน / สินค้า</TH>
-              <TH className="text-right">ราคา</TH>
-              <TH className="text-right">ขายแล้ว</TH>
-              <TH className="text-right">เรตติ้ง</TH>
-              <TH className="w-14 text-center"> </TH>
+              <th className="w-10 px-4 py-3 text-left">#</th>
+              <th className="px-4 py-3 text-left">ร้าน / สินค้า</th>
+              <SortTH label="ราคา" col="price" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortTH label="ขายแล้ว" col="sold" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortTH label="เรตติ้ง" col="rating" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <th className="w-14 px-4 py-3 text-center"> </th>
             </tr>
           </THead>
           <tbody>
-            {filtered.map((r, i) => {
+            {view.map((r, i) => {
               const mine = isMine(r);
               const isCheapest = r.price != null && r.price === minPrice;
               return (
                 <TR key={r.product_id} highlight={mine}>
-                  <TD className="muted">{i + 1}</TD>
+                  <TD className="muted tabular-nums">{i + 1}</TD>
                   <TD>
                     <div className="flex items-center gap-3">
                       <ImageZoom
@@ -115,24 +164,30 @@ export function CompareTable({
                       </div>
                     </div>
                   </TD>
-                  <TD className="text-right">
+                  <TD className="text-right tabular-nums">
+                    {/* ราคาตั้ง (ขีดฆ่า แดง) ถ้ามีและมากกว่าราคาขายจริง */}
+                    {r.price_before != null && r.price != null && r.price_before > r.price && (
+                      <div className="text-[11px] text-rose-500 line-through">
+                        ฿{fmt(r.price_before)}
+                      </div>
+                    )}
                     <span
                       className={
-                        isCheapest
-                          ? "font-bold text-emerald-300"
-                          : "font-semibold text-white"
+                        r.price_before != null && r.price != null && r.price_before > r.price
+                          ? "font-bold text-emerald-700" // มีส่วนลด → เขียว
+                          : isCheapest
+                            ? "font-bold text-emerald-700"
+                            : "font-semibold text-brand-700"
                       }
                     >
                       ฿{fmt(r.price)}
                     </span>
-                    {isCheapest && (
-                      <div className="text-[10px] text-emerald-400">ถูกสุด</div>
-                    )}
+                    {isCheapest && <div className="text-[10px] text-emerald-700">ถูกสุด</div>}
                   </TD>
-                  <TD className="muted text-right">{fmt(r.sold)}</TD>
-                  <TD className="text-right">
+                  <TD className="muted text-right tabular-nums">{fmt(r.sold)}</TD>
+                  <TD className="text-right tabular-nums">
                     {r.rating != null ? (
-                      <span className="text-amber-300">⭐ {r.rating}</span>
+                      <span className="text-amber-600">⭐ {r.rating}</span>
                     ) : (
                       <span className="muted">-</span>
                     )}
@@ -146,7 +201,7 @@ export function CompareTable({
                         href={r.product_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center justify-center rounded-lg p-2 text-brand-300 transition hover:bg-white/5 hover:text-brand-200"
+                        className="inline-flex items-center justify-center rounded-lg p-2 text-brand-600 transition hover:bg-brand-50 hover:text-brand-700"
                         aria-label={`เปิดบน ${platformLabel(r.platform)}`}
                       >
                         <IconExternal />
@@ -160,6 +215,43 @@ export function CompareTable({
         </Table>
       )}
     </div>
+  );
+}
+
+// header ที่ sort ได้ — คลิกเรียง, แสดงลูกศร, ใส่ aria-sort เพื่อ a11y
+function SortTH({
+  label,
+  col,
+  sortKey,
+  sortDir,
+  onClick,
+}: {
+  label: string;
+  col: SortKey;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onClick: (k: SortKey) => void;
+}) {
+  const activeCol = sortKey === col;
+  return (
+    <th
+      className="px-4 py-3 text-right"
+      aria-sort={activeCol ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => onClick(col)}
+        className={
+          "inline-flex items-center gap-1 transition hover:text-ink-900 " +
+          (activeCol ? "text-brand-700" : "text-[var(--muted)]")
+        }
+      >
+        {label}
+        <span className="text-[10px]">
+          {activeCol ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+        </span>
+      </button>
+    </th>
   );
 }
 
@@ -178,8 +270,8 @@ function FilterChip({
       className={
         "rounded-full border px-3 py-1 text-xs font-medium transition " +
         (active
-          ? "border-brand-400/40 bg-brand-500/20 text-brand-100"
-          : "border-[var(--border)] bg-white/5 text-[var(--muted)] hover:text-white")
+          ? "border-brand-300 bg-brand-100 text-brand-700"
+          : "border-[var(--border)] bg-white text-[var(--muted)] hover:text-ink-900")
       }
     >
       {label}

@@ -25,6 +25,7 @@ type IngestItem = {
   imageUrl?: string | null;
   productUrl?: string | null;
   price?: number | null; // บาท (extension แปลงเป็นบาทมาแล้ว)
+  priceBefore?: number | null; // ราคาตั้งก่อนลด
   sold?: number | null;
   rating?: number | null;
   ratingCount?: number | null;
@@ -123,6 +124,7 @@ export async function POST(req: Request) {
     await db.insert(snapshots).values({
       productId: prod.id,
       price: item.price != null ? String(item.price) : null,
+      priceBefore: item.priceBefore != null ? String(item.priceBefore) : null,
       sold: item.sold ?? null,
       rating: item.rating != null ? String(item.rating) : null,
       ratingCount: item.ratingCount ?? null,

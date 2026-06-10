@@ -92,7 +92,7 @@ export function KeywordSearch({ existing }: { existing: string[] }) {
       {msg && (
         <div
           className={
-            "mt-2 text-xs " + (msg.tone === "ok" ? "text-emerald-300" : "text-rose-300")
+            "mt-2 text-xs " + (msg.tone === "ok" ? "text-emerald-700" : "text-rose-600")
           }
         >
           {msg.text}
