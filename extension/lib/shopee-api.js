@@ -42,13 +42,23 @@ export async function fetchShopeeItems(keyword, { maxItems = 60 } = {}) {
       res = await doFetch();
     }
 
+    // 403 มักแปลว่า Shopee ขอ CAPTCHA — บอก user ให้ไปยืนยันตัวตน (โค้ดยิงผ่านไม่ได้)
+    const CAPTCHA_MSG =
+      "Shopee ขอให้ยืนยันตัวตน (CAPTCHA) — เปิด shopee.co.th แล้วค้นหาสินค้าสักครั้ง เลื่อนจิ๊กซอว์ให้ผ่าน แล้วลองใหม่";
+    if (res.status === 403) {
+      throw new Error(CAPTCHA_MSG);
+    }
     if (!res.ok) {
       throw new Error(`Shopee API HTTP ${res.status}`);
     }
 
     const data = await res.json();
 
-    // ถ้าโดน anti-bot Shopee มักคืน error หรือ items ว่าง + มี field error
+    // error: 90309999 = ต้องผ่าน CAPTCHA ก่อน (status ยังเป็น 200 แต่ body มี error นี้)
+    if (data?.error === 90309999) {
+      throw new Error(CAPTCHA_MSG);
+    }
+    // anti-bot อื่น ๆ
     if (data?.error) {
       throw new Error(`Shopee API error: ${data.error} ${data.error_msg || ""}`);
     }
