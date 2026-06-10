@@ -27,9 +27,18 @@ function fmt(n: number | null) {
   return n == null ? "-" : Number(n).toLocaleString("th-TH");
 }
 
-// คอลัมน์ที่ sort ได้ — key ตรงกับฟิลด์ตัวเลขใน CompareRow
-type SortKey = "price" | "sold" | "rating";
+// คอลัมน์ตัวเลขที่คลิก header เรียงได้
+type SortKey = "relevance" | "price" | "sold" | "revenue" | "rating";
 type SortDir = "asc" | "desc";
+
+// preset เรียงด่วน (dropdown) — relevance/ขายดี/ยอดขายรวม/ถูกสุด
+const SORT_PRESETS: { label: string; key: SortKey; dir: SortDir }[] = [
+  { label: "ตามผลลัพธ์ Shopee", key: "relevance", dir: "asc" },
+  { label: "ขายดีสุด (จำนวน)", key: "sold", dir: "desc" },
+  { label: "ยอดขายรวมสูงสุด", key: "revenue", dir: "desc" },
+  { label: "ราคาถูกสุด", key: "price", dir: "asc" },
+  { label: "เรตติ้งสูงสุด", key: "rating", dir: "desc" },
+];
 
 export function CompareTable({
   rows,
@@ -40,8 +49,8 @@ export function CompareTable({
 }) {
   const [active, setActive] = useState<string | "all">("all");
   const [query, setQuery] = useState("");
-  // เริ่มเรียงราคาถูก→แพง (ตรงกับพฤติกรรมเดิม)
-  const [sortKey, setSortKey] = useState<SortKey>("price");
+  // default = relevance (ตามลำดับผลลัพธ์ของ Shopee เดิม ไม่ sort)
+  const [sortKey, setSortKey] = useState<SortKey>("relevance");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const platforms = useMemo(() => {
@@ -54,7 +63,12 @@ export function CompareTable({
     return !!(mine && r.shop_name && r.shop_name === mine);
   }
 
-  // คลิก header: ถ้า key เดิม → สลับทิศ, ถ้า key ใหม่ → ตั้ง default (ราคา asc, ที่เหลือ desc)
+  // ยอดขายรวม (มูลค่าโดยประมาณ) = ราคา × จำนวนขายสะสม — Shopee ไม่มี field ตรง
+  function revenue(r: CompareRow) {
+    return r.price != null && r.sold != null ? r.price * r.sold : null;
+  }
+
+  // คลิก header: key เดิม → สลับทิศ · key ใหม่ → default (ราคา asc, ที่เหลือ desc)
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -74,13 +88,16 @@ export function CompareTable({
           (r.shop_name || "").toLowerCase().includes(q),
       );
     }
-    // เรียงตาม sortKey/sortDir — ค่า null ไปท้ายเสมอ
+    // relevance = ลำดับเดิมจาก Shopee (ไม่ sort)
+    if (sortKey === "relevance") return v;
+    const valOf = (r: CompareRow) =>
+      sortKey === "revenue" ? r.price != null && r.sold != null ? r.price * r.sold : null : r[sortKey];
     const dir = sortDir === "asc" ? 1 : -1;
     return [...v].sort((a, b) => {
-      const av = a[sortKey];
-      const bv = b[sortKey];
+      const av = valOf(a);
+      const bv = valOf(b);
       if (av == null && bv == null) return 0;
-      if (av == null) return 1;
+      if (av == null) return 1; // null ไปท้ายเสมอ
       if (bv == null) return -1;
       return (av - bv) * dir;
     });
@@ -115,12 +132,30 @@ export function CompareTable({
             </>
           )}
         </div>
-        <input
-          className="input-field sm:w-64"
-          placeholder="ค้นในตาราง (ชื่อสินค้า/ร้าน)…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="flex gap-2">
+          <select
+            className="input-field sm:w-48"
+            value={`${sortKey}:${sortDir}`}
+            onChange={(e) => {
+              const [k, d] = e.target.value.split(":") as [SortKey, SortDir];
+              setSortKey(k);
+              setSortDir(d);
+            }}
+            aria-label="เรียงลำดับ"
+          >
+            {SORT_PRESETS.map((p) => (
+              <option key={`${p.key}:${p.dir}`} value={`${p.key}:${p.dir}`}>
+                เรียง: {p.label}
+              </option>
+            ))}
+          </select>
+          <input
+            className="input-field sm:w-56"
+            placeholder="ค้นในตาราง…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {view.length === 0 ? (
@@ -135,6 +170,7 @@ export function CompareTable({
               <th className="px-4 py-3 text-left">ร้าน / สินค้า</th>
               <SortTH label="ราคา" col="price" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortTH label="ขายแล้ว" col="sold" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortTH label="ยอดขายรวม" col="revenue" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortTH label="เรตติ้ง" col="rating" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <th className="w-14 px-4 py-3 text-center"> </th>
             </tr>
@@ -186,8 +222,16 @@ export function CompareTable({
                   </TD>
                   <TD className="muted text-right tabular-nums">{fmt(r.sold)}</TD>
                   <TD className="text-right tabular-nums">
+                    {revenue(r) != null ? (
+                      <span className="font-medium text-ink-900">฿{fmt(revenue(r))}</span>
+                    ) : (
+                      <span className="muted">-</span>
+                    )}
+                  </TD>
+                  <TD className="text-right tabular-nums">
+                    {/* เอา icon ดาวออกจาก data — เหลือเลขเรตติ้ง */}
                     {r.rating != null ? (
-                      <span className="text-amber-600">⭐ {r.rating}</span>
+                      <span className="font-medium text-amber-700">{r.rating}</span>
                     ) : (
                       <span className="muted">-</span>
                     )}
