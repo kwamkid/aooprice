@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSetting, setSetting } from "@/lib/settings";
+import { withCors, preflight } from "@/lib/cors";
 
 export const runtime = "nodejs";
+
+export const OPTIONS = preflight;
 
 // GET /api/settings — ค่าตั้งค่ารวม: ชื่อร้านเราแยกต่อ platform
 // ใช้ทั้งฝั่งเว็บ (โหลดฟอร์ม) และ extension (รู้ชื่อร้านเราตอนส่ง ingest)
@@ -14,12 +17,12 @@ export async function GET() {
     getSetting("my_shop"),
   ]);
   const myShopShopee = shopee ?? legacy ?? null;
-  return NextResponse.json({
+  return withCors(NextResponse.json({
     myShopShopee,
     myShopTiktok: tiktok ?? null,
     myShopLazada: lazada ?? null,
     myShop: myShopShopee, // legacy alias
-  });
+  }));
 }
 
 // POST /api/settings — บันทึก { myShopShopee?, myShopTiktok?, myShopLazada? }
@@ -34,7 +37,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+    return withCors(NextResponse.json({ error: "invalid json" }, { status: 400 }));
   }
   const norm = (v: string | null | undefined) => v?.trim() || null;
   const shopee = norm(body.myShopShopee ?? body.myShop);
@@ -45,10 +48,10 @@ export async function POST(req: Request) {
     setSetting("my_shop_tiktok", tiktok),
     setSetting("my_shop_lazada", lazada),
   ]);
-  return NextResponse.json({
+  return withCors(NextResponse.json({
     myShopShopee: shopee,
     myShopTiktok: tiktok,
     myShopLazada: lazada,
     myShop: shopee,
-  });
+  }));
 }

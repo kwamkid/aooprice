@@ -3,8 +3,11 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { keywords, products, snapshots } from "@/lib/schema";
 import { checkIngestAuth } from "@/lib/auth";
+import { withCors, preflight } from "@/lib/cors";
 
 export const runtime = "nodejs";
+
+export const OPTIONS = preflight;
 
 type Platform = "shopee" | "tiktok" | "lazada";
 const PLATFORMS: Platform[] = ["shopee", "tiktok", "lazada"];
@@ -40,22 +43,22 @@ type IngestBody = {
 
 export async function POST(req: Request) {
   if (!checkIngestAuth(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return withCors(NextResponse.json({ error: "unauthorized" }, { status: 401 }));
   }
 
   let body: IngestBody;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+    return withCors(NextResponse.json({ error: "invalid json" }, { status: 400 }));
   }
 
   const kw = body.keyword?.trim();
   if (!kw || !Array.isArray(body.items)) {
-    return NextResponse.json(
+    return withCors(NextResponse.json(
       { error: "keyword and items[] required" },
       { status: 400 },
-    );
+    ));
   }
 
   // 1) upsert keyword (สร้างถ้ายังไม่มี, อัพเดต label / ชื่อร้านเราต่อ platform ถ้าส่งมา)
@@ -128,10 +131,10 @@ export async function POST(req: Request) {
     snapshotCount++;
   }
 
-  return NextResponse.json({
+  return withCors(NextResponse.json({
     ok: true,
     keywordId,
     products: body.items.length,
     snapshots: snapshotCount,
-  });
+  }));
 }
