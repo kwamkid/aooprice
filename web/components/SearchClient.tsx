@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CompareTable, type CompareRow } from "@/components/CompareTable";
+import { DinoGame } from "@/components/DinoGame";
 
 // ค้นหา real-time — ยิงผ่าน extension เท่านั้น (ดู CLAUDE.md "ยิงสด = ผ่าน extension")
 // flow: POST /api/search-job → poll ทุก 2 วิ → extension claim+ยิง+ส่งผลกลับ → done → แสดงตาราง
@@ -45,6 +46,46 @@ function toRows(items: AdhocItem[], platform: string): CompareRow[] {
 const POLL_MS = 2000;
 const TIMEOUT_MS = 90_000; // เลิก poll หลัง 90 วิ (extension อาจไม่เปิด)
 
+// rate-limit ค้นสด (fix ในระบบ) — กันค้นถี่จนโดน Shopee CAPTCHA [[shopee-captcha-not-a-bug]]
+const COOLDOWN_MS = 60_000; // ต้องรอ 60 วิ ระหว่างแต่ละครั้ง
+const WINDOW_MS = 10 * 60_000; // หน้าต่าง 10 นาที
+const MAX_IN_WINDOW = 10; // ค้นได้สูงสุด 10 ครั้งใน 10 นาที
+const LS_KEY = "aooprice.searchTimes"; // เก็บ timestamp การค้นใน localStorage
+
+function loadTimes(): number[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    const arr = raw ? (JSON.parse(raw) as number[]) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+// คืนสถานะ rate-limit ณ เวลา now: ค้นได้ไหม + ต้องรอกี่วิ + เหตุผล
+function rateStatus(times: number[], now: number) {
+  const recent = times.filter((t) => now - t < WINDOW_MS);
+  const last = recent.length ? Math.max(...recent) : 0;
+  const cooldownLeft = last ? Math.max(0, COOLDOWN_MS - (now - last)) : 0;
+  if (recent.length >= MAX_IN_WINDOW) {
+    // ครบเพดาน — รอจนตัวที่เก่าสุดหลุดหน้าต่าง
+    const oldest = Math.min(...recent);
+    return {
+      ok: false,
+      secondsLeft: Math.ceil((WINDOW_MS - (now - oldest)) / 1000),
+      reason: `ครบเพดาน ${MAX_IN_WINDOW} ครั้งใน 10 นาที`,
+    };
+  }
+  if (cooldownLeft > 0) {
+    return {
+      ok: false,
+      secondsLeft: Math.ceil(cooldownLeft / 1000),
+      reason: "เพิ่งค้นไป กันค้นถี่เกิน (ลด CAPTCHA)",
+    };
+  }
+  return { ok: true, secondsLeft: 0, reason: "" };
+}
+
 type State =
   | { kind: "idle" }
   | { kind: "waiting"; keyword: string } // รอ extension
@@ -55,7 +96,19 @@ export function SearchClient({ shopFilter }: { shopFilter?: boolean }) {
   const [q, setQ] = useState("");
   const [shop, setShop] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
+  // rate-limit: now เดินทุกวินาทีเพื่อ re-คำนวณ countdown (เริ่ม 0 = SSR-safe)
+  const [now, setNow] = useState(0);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const rate = now ? rateStatus(loadTimes(), now) : { ok: true, secondsLeft: 0, reason: "" };
+  const searching = state.kind === "waiting";
+  const blocked = !rate.ok || searching;
 
   function stopPolling() {
     if (pollRef.current) {
@@ -67,6 +120,17 @@ export function SearchClient({ shopFilter }: { shopFilter?: boolean }) {
   async function runSearch() {
     const keyword = q.trim();
     if (!keyword) return;
+    // block ที่การกระทำ: ถ้าติด rate-limit ห้ามยิง
+    if (!rateStatus(loadTimes(), Date.now()).ok) return;
+    // บันทึกเวลาค้น (กันเกินเพดาน/cooldown)
+    try {
+      const times = loadTimes().filter((t) => Date.now() - t < WINDOW_MS);
+      times.push(Date.now());
+      localStorage.setItem(LS_KEY, JSON.stringify(times));
+    } catch {
+      /* localStorage ไม่ว่าง — ข้ามได้ */
+    }
+    setNow(Date.now());
     stopPolling();
     setState({ kind: "waiting", keyword });
 
@@ -142,15 +206,39 @@ export function SearchClient({ shopFilter }: { shopFilter?: boolean }) {
             onChange={(e) => setShop(e.target.value)}
           />
         )}
-        <Button type="submit" disabled={!q.trim() || state.kind === "waiting"} className="shrink-0">
-          {state.kind === "waiting" ? "กำลังค้น…" : "ค้นหา"}
+        <Button
+          type="submit"
+          disabled={!q.trim() || blocked}
+          className="shrink-0"
+        >
+          {searching
+            ? "กำลังค้น…"
+            : !rate.ok
+              ? `รออีก ${rate.secondsLeft} วิ`
+              : "ค้นหา"}
         </Button>
       </form>
 
-      {state.kind === "waiting" && (
-        <EmptyState icon="⏳" title={`กำลังค้น "${state.keyword}" ผ่าน Extension…`}>
-          ผลจะมาภายใน ~ไม่กี่วินาที–1 นาที · ต้องเปิด Chrome ที่ติดตั้ง extension ค้างไว้
-        </EmptyState>
+      {/* เหตุผลที่ค้นไม่ได้ตอนนี้ (cooldown / เพดาน) */}
+      {!searching && !rate.ok && (
+        <div className="muted mb-4 text-xs">
+          ⏳ {rate.reason} · ค้นได้อีกใน {rate.secondsLeft} วินาที
+        </div>
+      )}
+
+      {searching && (
+        <div className="mb-4">
+          <div className="mb-3 rounded-xl border border-[var(--border)] bg-gradient-card p-4">
+            <div className="font-semibold">
+              ⏳ กำลังค้น &quot;{state.keyword}&quot; ผ่าน Extension…
+            </div>
+            <div className="muted mt-1 text-xs">
+              ผลจะมาภายใน ~ไม่กี่วินาที–1 นาที · ต้องเปิด Chrome ที่ติดตั้ง extension ค้างไว้ ·
+              เล่นเกมรอได้เลย 👇
+            </div>
+          </div>
+          <DinoGame />
+        </div>
       )}
 
       {state.kind === "error" && (
