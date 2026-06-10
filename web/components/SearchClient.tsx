@@ -28,25 +28,24 @@ type AdhocItem = {
   platform?: string | null;
 };
 
+// คงลำดับเดิมจาก Shopee (relevance) — ไม่ sort ที่นี่ ให้ CompareTable จัดการ sort เอง
 function toRows(items: AdhocItem[], platform: string): CompareRow[] {
-  return items
-    .map((it, i) => ({
-      product_id: i, // ad-hoc ไม่มี id จริง ใช้ index เป็น key
-      platform: it.platform || platform,
-      shop_name: it.shopName ?? null,
-      title: it.title ?? null,
-      image_url: it.imageUrl ?? null,
-      product_url: it.productUrl ?? null,
-      price: it.price ?? null,
-      price_before: it.priceBefore ?? null,
-      sold: it.sold ?? it.soldTotal ?? null,
-      sold_monthly: it.soldMonthly ?? null,
-      sold_total: it.soldTotal ?? it.sold ?? null,
-      rating: it.rating ?? null,
-      rating_count: it.ratingCount ?? null,
-      is_official: it.isOfficial ?? null,
-    }))
-    .sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+  return items.map((it, i) => ({
+    product_id: i, // ad-hoc ไม่มี id จริง ใช้ index เป็น key (= ลำดับ Shopee)
+    platform: it.platform || platform,
+    shop_name: it.shopName ?? null,
+    title: it.title ?? null,
+    image_url: it.imageUrl ?? null,
+    product_url: it.productUrl ?? null,
+    price: it.price ?? null,
+    price_before: it.priceBefore ?? null,
+    sold: it.sold ?? it.soldTotal ?? null,
+    sold_monthly: it.soldMonthly ?? null,
+    sold_total: it.soldTotal ?? it.sold ?? null,
+    rating: it.rating ?? null,
+    rating_count: it.ratingCount ?? null,
+    is_official: it.isOfficial ?? null,
+  }));
 }
 
 const POLL_MS = 2000;
