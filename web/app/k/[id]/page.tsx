@@ -27,7 +27,7 @@ async function getData(id: number) {
       ORDER BY s2.captured_at DESC LIMIT 1
     ) s ON true
     WHERE p.keyword_id = ${id}
-    ORDER BY s.price ASC NULLS LAST
+    ORDER BY p.id ASC
   `) as CompareRow[];
 
   return { kw, rows };
@@ -58,9 +58,16 @@ export default async function KeywordPage({
   const labels: Record<number, string> = {};
   rows.forEach((r) => (labels[r.product_id] = r.shop_name || `#${r.product_id}`));
 
+  // คำนวณ min/max จากค่าจริง (ไม่พึ่งลำดับ query — rows เรียงตาม Shopee แล้ว)
   const priced = rows.filter((r) => r.price != null);
-  const minPrice = priced[0]?.price ?? null;
-  const maxPrice = priced.length ? priced[priced.length - 1].price : null;
+  const cheapest = priced.reduce<CompareRow | null>(
+    (m, r) => (m == null || (r.price ?? Infinity) < (m.price ?? Infinity) ? r : m),
+    null,
+  );
+  const minPrice = cheapest?.price ?? null;
+  const maxPrice = priced.length
+    ? Math.max(...priced.map((r) => r.price as number))
+    : null;
   // อันดับร้านเรา: หาแถวแรกที่ชื่อร้านตรงกับ my_shop ของ platform นั้น
   const myRow = rows.find(
     (r) => r.shop_name && r.shop_name === myShopByPlatform[r.platform],
@@ -96,7 +103,7 @@ export default async function KeywordPage({
         <StatCard
           label="ราคาต่ำสุด"
           value={minPrice != null ? "฿" + fmt(minPrice) : "-"}
-          hint={priced[0]?.shop_name ?? undefined}
+          hint={cheapest?.shop_name ?? undefined}
         />
         <StatCard
           label="ราคาสูงสุด"

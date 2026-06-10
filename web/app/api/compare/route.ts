@@ -63,7 +63,7 @@ export async function GET(req: Request) {
       LIMIT 1
     ) s ON true
     WHERE p.keyword_id = ${kw.id}
-    ORDER BY s.price ASC NULLS LAST
+    ORDER BY p.id ASC
   `;
 
   const items = rows.map((r, idx) => {

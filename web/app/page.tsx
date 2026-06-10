@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconTag, IconStore, IconChart } from "@/components/ui/icons";
 import { KeywordSearch } from "@/components/KeywordSearch";
+import { CardScrapeButton } from "@/components/CardScrapeButton";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -191,8 +192,9 @@ export default async function HomePage() {
                       </div>
                     )}
 
-                    <div className="mt-4 border-t border-[var(--border)] pt-3">
+                    <div className="mt-4 flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
                       {staleBadge(k.last_captured)}
+                      <CardScrapeButton keyword={k.keyword} />
                     </div>
                   </Card>
                 </Link>
