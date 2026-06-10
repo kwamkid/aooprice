@@ -73,3 +73,10 @@ export const IconExternal = (p: P) => (
     <path d="M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6" />
   </svg>
 );
+
+export const IconSearch = (p: P) => (
+  <svg {...base} width="20" height="20" {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m21 21-4.3-4.3" />
+  </svg>
+);

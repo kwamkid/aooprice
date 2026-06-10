@@ -14,6 +14,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // 0) cleanup search jobs (ad-hoc): ลบ job เก่า > 1 วัน + ปลด job ค้าง running > 5 นาที
+  //    (extension claim แล้ว crash/ปิด — กันค้างถาวร)
+  let searchJobsCleaned = 0;
+  try {
+    const del = await sql`DELETE FROM search_jobs WHERE created_at < now() - interval '1 day' RETURNING id`;
+    await sql`UPDATE search_jobs SET status = 'error', error = 'expired'
+              WHERE status = 'running' AND claimed_at < now() - interval '5 minutes'`;
+    searchJobsCleaned = del.length;
+  } catch {
+    // ตาราง search_jobs อาจยังไม่มีในบาง env — ไม่ให้ cron ล้ม
+  }
+
   // 1) ความสดของข้อมูลต่อ keyword
   const freshness = await sql`
     SELECT
@@ -76,5 +88,6 @@ export async function GET(req: Request) {
     ranAt: new Date().toISOString(),
     staleKeywords,
     priceChanges,
+    searchJobsCleaned,
   });
 }

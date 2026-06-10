@@ -57,7 +57,12 @@ chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_SCRAPE) runScrape();
-  if (alarm.name === ALARM_POLL) pollWebRequest();
+  if (alarm.name === ALARM_POLL) {
+    pollWebRequest();
+    // alarm ทุก 1 นาทีคือขั้นต่ำ — แต่ค้นสดต้องไวกว่านั้น จึงปั่น fast-poll
+    // ทุก 5 วิ ต่ออีกราว ๆ 1 รอบ alarm ขณะ service worker ยังตื่น
+    startFastPoll();
+  }
 });
 
 // เช็คคิว "ดึงเดี๋ยวนี้" ที่กดจากหน้าเว็บ — ถ้ามีก็ดึงเลย (consume=1 เพื่อกันดึงซ้ำ)
@@ -73,6 +78,78 @@ async function pollWebRequest() {
     }
   } catch {
     // เงียบไว้ — เว็บอาจปิด/ออฟไลน์ชั่วคราว
+  }
+}
+
+// ===== ค้นหา real-time (ad-hoc) — ดู CLAUDE.md "ยิงสด = ผ่าน extension" =====
+
+// fast-poll: เช็คคิวค้นสดทุก 5 วิ ~11 รอบ (≈55 วิ) แล้วหยุด รอ alarm รอบหน้าปลุกใหม่
+// ทำให้ latency การค้นสดเหลือ ~5 วิ ขณะ worker ตื่น (แทนที่จะรอ alarm 1 นาที)
+let fastPollTimer = null;
+let fastPollLeft = 0;
+function startFastPoll() {
+  fastPollLeft = 11;
+  if (fastPollTimer) return; // กำลังปั่นอยู่แล้ว
+  const tick = async () => {
+    await pollSearchJob();
+    if (--fastPollLeft > 0) {
+      fastPollTimer = setTimeout(tick, 5000);
+    } else {
+      fastPollTimer = null;
+    }
+  };
+  tick();
+}
+
+// claim job ค้นสด 1 อันจากเว็บ → ยิง marketplace สด → ส่งผลกลับ (ไม่เข้า DB ถาวร)
+async function pollSearchJob() {
+  let job;
+  try {
+    const res = await fetch(apiBase() + "/api/search-job?claim=1", {
+      headers: { authorization: authHeader },
+    });
+    if (!res.ok) return;
+    job = (await res.json()).job;
+  } catch {
+    return; // เว็บปิด/ออฟไลน์
+  }
+  if (!job) return; // ไม่มีคิว
+
+  try {
+    const items = await scrapeAdhoc(job.platform || "shopee", job.keyword);
+    await postJobResult(job.id, { items });
+  } catch (e) {
+    await postJobResult(job.id, { error: String(e.message || e) });
+  }
+}
+
+// เปิดแท็บ search ของ platform → สั่ง content ดึง keyword เดียว (คืน items ตรง ๆ ไม่ ingest)
+async function scrapeAdhoc(platform, keyword) {
+  const make = PLATFORM_SEARCH[platform] || PLATFORM_SEARCH.shopee;
+  const tab = await chrome.tabs.create({ url: make(keyword), active: false });
+  try {
+    await waitForTabComplete(tab.id);
+    await new Promise((r) => setTimeout(r, platform === "shopee" ? 1500 : 3500));
+    const resp = await chrome.tabs.sendMessage(tab.id, {
+      type: "SCRAPE_ONE_ADHOC",
+      keyword,
+    });
+    if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
+    return resp.items || [];
+  } finally {
+    setTimeout(() => chrome.tabs.remove(tab.id).catch(() => {}), 1000);
+  }
+}
+
+async function postJobResult(jobId, payload) {
+  try {
+    await fetch(apiBase() + "/api/search-job/result", {
+      method: "POST",
+      headers: { authorization: authHeader, "Content-Type": "application/json" },
+      body: JSON.stringify({ jobId, ...payload }),
+    });
+  } catch {
+    // เว็บปิดไปแล้ว — job จะถูก expire โดย cron
   }
 }
 

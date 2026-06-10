@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import {
   IconDashboard,
   IconRefresh,
+  IconSearch,
   IconSettings,
 } from "@/components/ui/icons";
 
@@ -19,6 +20,7 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/", label: "ภาพรวม", icon: IconDashboard, match: (p) => p === "/" || p.startsWith("/k") },
+  { href: "/search", label: "ค้นหาเทียบราคา", icon: IconSearch, match: (p) => p.startsWith("/search") },
   { href: "/settings", label: "ตั้งค่า", icon: IconSettings, match: (p) => p.startsWith("/settings") },
 ];
 

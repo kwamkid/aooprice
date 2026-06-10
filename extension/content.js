@@ -115,6 +115,13 @@
         .catch((e) => sendResponse({ ok: false, error: String(e.message || e) }));
       return true;
     }
+    // ค้นสด (ad-hoc): ดึง keyword เดียวแล้วคืน items ตรง ๆ — ไม่ ingest เข้า DB ถาวร
+    if (msg.type === "SCRAPE_ONE_ADHOC") {
+      fetchItems(msg.keyword, { maxItems: CONFIG.MAX_ITEMS })
+        .then((items) => sendResponse({ ok: true, items }))
+        .catch((e) => sendResponse({ ok: false, error: String(e.message || e) }));
+      return true;
+    }
   });
 
   // ---- inject ปุ่ม Rescan ลอย ----

@@ -8,6 +8,7 @@ import {
   numeric,
   boolean,
   timestamp,
+  jsonb,
   index,
   unique,
 } from "drizzle-orm/pg-core";
@@ -85,7 +86,29 @@ export const snapshots = pgTable(
   }),
 );
 
+// ค้นหา real-time (ad-hoc) — เว็บตั้ง job → extension poll claim → ยิงสด → ส่งผลกลับ
+// ไม่ผูกกับ keywords/products ถาวร (ad-hoc = ใช้แล้วทิ้ง) เก็บผลเป็น jsonb ก้อนเดียว
+// status: pending (รอ extension) → running (claim แล้ว) → done | error
+export const searchJobs = pgTable(
+  "search_jobs",
+  {
+    id: text("id").primaryKey(), // crypto.randomUUID()
+    keyword: text("keyword").notNull(),
+    platform: text("platform").notNull().default("shopee"), // เฟสแรก shopee
+    status: text("status").notNull().default("pending"),
+    result: jsonb("result"), // array ของ item (รูปใกล้ CompareRow) — null จนกว่า done
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    byStatusTime: index("idx_search_jobs_status_time").on(t.status, t.createdAt),
+  }),
+);
+
 export type Setting = typeof settings.$inferSelect;
 export type Keyword = typeof keywords.$inferSelect;
 export type Product = typeof products.$inferSelect;
 export type Snapshot = typeof snapshots.$inferSelect;
+export type SearchJob = typeof searchJobs.$inferSelect;
