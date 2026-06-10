@@ -140,6 +140,98 @@ const PLATFORM_HOST = {
   lazada: "lazada.co.th",
 };
 
+// ⚠️ ฟังก์ชันนี้ถูก inject ไปรันใน MAIN world ของหน้า Shopee (chrome.scripting.executeScript)
+// เหตุผล: content script (isolated world) ยิง search API แล้วโดน 403 เพราะขาด anti-bot
+//   token ที่ JS ของหน้า Shopee patch ลง fetch ใน main world. รันที่ main world = ได้ token ครบ
+// 🔒 ต้อง self-contained 100% — ห้ามอ้างอิงตัวแปร/ฟังก์ชันนอก body (executeScript serialize
+//   เฉพาะ source ของฟังก์ชัน ไม่เอา closure). args ส่งผ่าน structured-clone ได้เฉพาะ primitive
+function shopeeMainWorldFetch(keyword, maxItems) {
+  const SEARCH_API = "https://shopee.co.th/api/v4/search/search_items";
+  const toBaht = (raw) => (raw == null ? null : Math.round(raw / 1000) / 100);
+  const mapItem = (b) => {
+    const rating = b.item_rating || {};
+    const rc = rating.rating_count || [];
+    return {
+      platform: "shopee",
+      itemId: b.itemid,
+      shopId: b.shopid,
+      shopName: b.shop_name || null,
+      title: b.name || null,
+      imageUrl: b.image
+        ? `https://down-th.img.susercontent.com/file/${b.image}`
+        : null,
+      productUrl: `https://shopee.co.th/product/${b.shopid}/${b.itemid}`,
+      price: toBaht(b.price ?? b.price_min),
+      sold: b.historical_sold ?? b.sold ?? null,
+      rating:
+        rating.rating_star != null
+          ? Math.round(rating.rating_star * 10) / 10
+          : null,
+      ratingCount: Array.isArray(rc) ? rc[0] ?? null : null,
+      isOfficial: !!(b.is_official_shop || b.shopee_verified),
+    };
+  };
+  return (async () => {
+    const limit = 60;
+    const collected = [];
+    let page = 0;
+    const opts = {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "x-api-source": "pc",
+        "x-shopee-language": "th",
+        "x-requested-with": "XMLHttpRequest",
+        referer: `https://shopee.co.th/search?keyword=${encodeURIComponent(keyword)}`,
+      },
+    };
+    while (collected.length < maxItems) {
+      const url =
+        `${SEARCH_API}?by=relevancy&keyword=${encodeURIComponent(keyword)}` +
+        `&limit=${limit}&newest=${page * limit}&order=desc&page_type=search` +
+        `&scenario=PAGE_GLOBAL_SEARCH&version=2`;
+      let res = await fetch(url, opts);
+      for (let a = 1; a <= 2 && (res.status === 403 || res.status === 429); a++) {
+        await new Promise((r) => setTimeout(r, a * 2500));
+        res = await fetch(url, opts);
+      }
+      if (res.status === 403) return { ok: false, error: "CAPTCHA" };
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+      const data = await res.json();
+      if (data?.error === 90309999) return { ok: false, error: "CAPTCHA" };
+      if (data?.error)
+        return { ok: false, error: `Shopee error ${data.error} ${data.error_msg || ""}` };
+      const items = data?.items || [];
+      if (!items.length) break;
+      for (const it of items) {
+        const b = it.item_basic || it.item || {};
+        if (b.itemid && b.shopid) collected.push(mapItem(b));
+      }
+      page++;
+      if (items.length < limit) break;
+      await new Promise((r) => setTimeout(r, 600));
+    }
+    return { ok: true, items: collected.slice(0, maxItems) };
+  })();
+}
+
+// ยิง Shopee ผ่าน MAIN world ของแท็บที่ระบุ แล้วคืน items (กัน 403 จาก isolated world)
+async function scrapeShopeeMainWorld(tabId, keyword, maxItems) {
+  const CAPTCHA_MSG =
+    "Shopee ขอให้ยืนยันตัวตน (CAPTCHA) — เปิด shopee.co.th แล้วค้นหาสินค้าสักครั้ง เลื่อนจิ๊กซอว์ให้ผ่าน แล้วลองใหม่";
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    args: [keyword, maxItems],
+    func: shopeeMainWorldFetch,
+  });
+  const out = results?.[0]?.result;
+  L("main-world fetch ผล:", out ? (out.ok ? `ok ${out.items?.length} items` : `FAIL ${out.error}`) : "ไม่มีผล");
+  if (!out) throw new Error("main-world fetch ไม่มีผลลัพธ์ (หน้า navigate/crash?)");
+  if (!out.ok) throw new Error(out.error === "CAPTCHA" ? CAPTCHA_MSG : out.error);
+  return out.items;
+}
+
 // ค้นสด: ใช้แท็บ platform ที่ "เปิดอยู่แล้ว" ก่อน (session อุ่น + ผ่าน CAPTCHA แล้ว)
 // เพราะแท็บที่เพิ่งเปิดใหม่ มักโดน CAPTCHA (Shopee เห็นเป็น session ไม่มีประวัติ browsing)
 // ไม่มีแท็บเดิม → เปิดใหม่เป็น fallback (อาจเจอ CAPTCHA — user ต้องเลื่อนเอง)
@@ -155,18 +247,23 @@ async function scrapeAdhoc(platform, keyword) {
   const warmTab = existing.find((t) => t.id != null);
   L("หาแท็บ", host, "ที่เปิดอยู่:", existing.length, "แท็บ", warmTab ? `(ใช้ tab ${warmTab.id})` : "(ไม่มี — จะเปิดใหม่)");
 
+  // ดึงจากแท็บ: Shopee ใช้ main-world (กัน 403) · platform อื่นใช้ content message (DOM)
+  const pull = async (tabId) => {
+    if (platform === "shopee") {
+      L("ยิง Shopee ผ่าน MAIN world, tab", tabId);
+      return await scrapeShopeeMainWorld(tabId, keyword, CONFIG.MAX_ITEMS);
+    }
+    L("ส่ง SCRAPE_ONE_ADHOC ไปแท็บ", tabId);
+    const resp = await chrome.tabs.sendMessage(tabId, { type: "SCRAPE_ONE_ADHOC", keyword });
+    if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
+    return resp.items || [];
+  };
+
   if (warmTab) {
     L("นำแท็บอุ่นไปหน้า search:", make(keyword));
     await navigateTab(warmTab.id, make(keyword));
     await new Promise((r) => setTimeout(r, platform === "shopee" ? 2500 : 4000));
-    L("ส่ง SCRAPE_ONE_ADHOC ไปแท็บ", warmTab.id);
-    const resp = await chrome.tabs.sendMessage(warmTab.id, {
-      type: "SCRAPE_ONE_ADHOC",
-      keyword,
-    });
-    L("ได้ตอบจาก content:", resp?.ok ? `ok, ${resp.items?.length ?? 0} items` : `FAIL: ${resp?.error}`);
-    if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
-    return resp.items || [];
+    return await pull(warmTab.id);
   }
 
   // ไม่มีแท็บเดิม → เปิดใหม่ (โอกาสเจอ CAPTCHA สูงกว่า)
@@ -175,14 +272,7 @@ async function scrapeAdhoc(platform, keyword) {
   try {
     await waitForTabComplete(tab.id);
     await new Promise((r) => setTimeout(r, platform === "shopee" ? 6000 : 5000));
-    L("ส่ง SCRAPE_ONE_ADHOC ไปแท็บใหม่", tab.id);
-    const resp = await chrome.tabs.sendMessage(tab.id, {
-      type: "SCRAPE_ONE_ADHOC",
-      keyword,
-    });
-    L("ได้ตอบจาก content (แท็บใหม่):", resp?.ok ? `ok, ${resp.items?.length ?? 0} items` : `FAIL: ${resp?.error}`);
-    if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
-    return resp.items || [];
+    return await pull(tab.id);
   } finally {
     setTimeout(() => chrome.tabs.remove(tab.id).catch(() => {}), 1000);
   }
