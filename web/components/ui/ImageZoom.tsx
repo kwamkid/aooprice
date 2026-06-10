@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { IconClose } from "@/components/ui/icons";
 
@@ -18,6 +19,9 @@ export function ImageZoom({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   // ปิดด้วย Esc + ล็อก scroll ตอนเปิด
   useEffect(() => {
@@ -64,7 +68,9 @@ export function ImageZoom({
         />
       </button>
 
-      {open && (
+      {/* lightbox: render ผ่าน portal ที่ body — กัน fixed เพี้ยนเพราะ ancestor
+          ที่มี transform/animate (main มี animate-fade-in สร้าง containing block) */}
+      {open && mounted && createPortal(
         <div
           className="fixed inset-0 z-[100] grid h-screen w-screen place-items-center overflow-hidden bg-black/80 p-4 backdrop-blur-md animate-fade-in"
           onClick={() => setOpen(false)}
@@ -93,7 +99,8 @@ export function ImageZoom({
               </figcaption>
             )}
           </figure>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
