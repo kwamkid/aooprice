@@ -26,7 +26,9 @@ type IngestItem = {
   productUrl?: string | null;
   price?: number | null; // บาท (extension แปลงเป็นบาทมาแล้ว)
   priceBefore?: number | null; // ราคาตั้งก่อนลด
-  sold?: number | null;
+  sold?: number | null; // legacy
+  soldMonthly?: number | null;
+  soldTotal?: number | null;
   rating?: number | null;
   ratingCount?: number | null;
   isOfficial?: boolean | null;
@@ -125,7 +127,9 @@ export async function POST(req: Request) {
       productId: prod.id,
       price: item.price != null ? String(item.price) : null,
       priceBefore: item.priceBefore != null ? String(item.priceBefore) : null,
-      sold: item.sold ?? null,
+      sold: item.sold ?? item.soldTotal ?? null,
+      soldMonthly: item.soldMonthly ?? null,
+      soldTotal: item.soldTotal ?? item.sold ?? null,
       rating: item.rating != null ? String(item.rating) : null,
       ratingCount: item.ratingCount ?? null,
       isOfficial: item.isOfficial ?? null,

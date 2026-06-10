@@ -73,7 +73,9 @@ export const snapshots = pgTable(
       .references(() => products.id, { onDelete: "cascade" }),
     price: numeric("price", { precision: 12, scale: 2 }), // บาท (ราคาขายจริง)
     priceBefore: numeric("price_before", { precision: 12, scale: 2 }), // ราคาตั้งก่อนลด
-    sold: integer("sold"), // ขายแล้ว (historical_sold)
+    sold: integer("sold"), // (legacy) ขายสะสม
+    soldMonthly: integer("sold_monthly"), // ขาย/เดือน
+    soldTotal: integer("sold_total"), // ขายสะสมตลอด
     rating: numeric("rating", { precision: 2, scale: 1 }), // เรตติ้งเฉลี่ย
     ratingCount: integer("rating_count"),
     isOfficial: boolean("is_official"), // ป้าย Mall/Official

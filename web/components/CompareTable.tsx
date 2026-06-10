@@ -17,7 +17,9 @@ export type CompareRow = {
   product_url: string | null;
   price: number | null;
   price_before: number | null; // ราคาตั้ง (ก่อนลด) — null ถ้าไม่ลด
-  sold: number | null;
+  sold: number | null; // legacy
+  sold_monthly: number | null; // ขาย/เดือน
+  sold_total: number | null; // ขายสะสมตลอด
   rating: number | null;
   rating_count: number | null;
   is_official: boolean | null;
@@ -28,13 +30,14 @@ function fmt(n: number | null) {
 }
 
 // คอลัมน์ตัวเลขที่คลิก header เรียงได้
-type SortKey = "relevance" | "price" | "sold" | "revenue" | "rating";
+type SortKey = "relevance" | "price" | "soldMonthly" | "soldTotal" | "revenue" | "rating";
 type SortDir = "asc" | "desc";
 
-// preset เรียงด่วน (dropdown) — relevance/ขายดี/ยอดขายรวม/ถูกสุด
+// preset เรียงด่วน (dropdown)
 const SORT_PRESETS: { label: string; key: SortKey; dir: SortDir }[] = [
   { label: "ตามผลลัพธ์ Shopee", key: "relevance", dir: "asc" },
-  { label: "ขายดีสุด (จำนวน)", key: "sold", dir: "desc" },
+  { label: "ขายดี/เดือน", key: "soldMonthly", dir: "desc" },
+  { label: "ขายสะสมสูงสุด", key: "soldTotal", dir: "desc" },
   { label: "ยอดขายรวมสูงสุด", key: "revenue", dir: "desc" },
   { label: "ราคาถูกสุด", key: "price", dir: "asc" },
   { label: "เรตติ้งสูงสุด", key: "rating", dir: "desc" },
@@ -63,9 +66,10 @@ export function CompareTable({
     return !!(mine && r.shop_name && r.shop_name === mine);
   }
 
-  // ยอดขายรวม (มูลค่าโดยประมาณ) = ราคา × จำนวนขายสะสม — Shopee ไม่มี field ตรง
+  // ยอดขายรวม (มูลค่าโดยประมาณ) = ราคา × ขายสะสมตลอด — Shopee ไม่มี field ตรง
   function revenue(r: CompareRow) {
-    return r.price != null && r.sold != null ? r.price * r.sold : null;
+    const total = r.sold_total ?? r.sold;
+    return r.price != null && total != null ? r.price * total : null;
   }
 
   // คลิก header: key เดิม → สลับทิศ · key ใหม่ → default (ราคา asc, ที่เหลือ desc)
@@ -90,8 +94,12 @@ export function CompareTable({
     }
     // relevance = ลำดับเดิมจาก Shopee (ไม่ sort)
     if (sortKey === "relevance") return v;
-    const valOf = (r: CompareRow) =>
-      sortKey === "revenue" ? r.price != null && r.sold != null ? r.price * r.sold : null : r[sortKey];
+    const valOf = (r: CompareRow): number | null => {
+      if (sortKey === "revenue") return revenue(r);
+      if (sortKey === "soldMonthly") return r.sold_monthly ?? null;
+      if (sortKey === "soldTotal") return r.sold_total ?? r.sold ?? null;
+      return r[sortKey] as number | null;
+    };
     const dir = sortDir === "asc" ? 1 : -1;
     return [...v].sort((a, b) => {
       const av = valOf(a);
@@ -169,7 +177,8 @@ export function CompareTable({
               <th className="w-10 px-4 py-3 text-left">#</th>
               <th className="px-4 py-3 text-left">ร้าน / สินค้า</th>
               <SortTH label="ราคา" col="price" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-              <SortTH label="ขายแล้ว" col="sold" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortTH label="ขาย/เดือน" col="soldMonthly" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortTH label="ขายสะสม" col="soldTotal" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortTH label="ยอดขายรวม" col="revenue" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortTH label="เรตติ้ง" col="rating" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <th className="w-14 px-4 py-3 text-center"> </th>
@@ -220,7 +229,8 @@ export function CompareTable({
                     </span>
                     {isCheapest && <div className="text-[10px] text-emerald-700">ถูกสุด</div>}
                   </TD>
-                  <TD className="muted text-right tabular-nums">{fmt(r.sold)}</TD>
+                  <TD className="muted text-right tabular-nums">{fmt(r.sold_monthly)}</TD>
+                  <TD className="muted text-right tabular-nums">{fmt(r.sold_total ?? r.sold)}</TD>
                   <TD className="text-right tabular-nums">
                     {revenue(r) != null ? (
                       <span className="font-medium text-ink-900">฿{fmt(revenue(r))}</span>

@@ -20,6 +20,8 @@ type AdhocItem = {
   price?: number | null;
   priceBefore?: number | null;
   sold?: number | null;
+  soldMonthly?: number | null;
+  soldTotal?: number | null;
   rating?: number | null;
   ratingCount?: number | null;
   isOfficial?: boolean | null;
@@ -37,7 +39,9 @@ function toRows(items: AdhocItem[], platform: string): CompareRow[] {
       product_url: it.productUrl ?? null,
       price: it.price ?? null,
       price_before: it.priceBefore ?? null,
-      sold: it.sold ?? null,
+      sold: it.sold ?? it.soldTotal ?? null,
+      sold_monthly: it.soldMonthly ?? null,
+      sold_total: it.soldTotal ?? it.sold ?? null,
       rating: it.rating ?? null,
       rating_count: it.ratingCount ?? null,
       is_official: it.isOfficial ?? null,
@@ -122,14 +126,39 @@ export function SearchClient({ shopFilter }: { shopFilter?: boolean }) {
   // rate-limit: now เดินทุกวินาทีเพื่อ re-คำนวณ countdown (เริ่ม 0 = SSR-safe)
   const [now, setNow] = useState(0);
   const [recent, setRecent] = useState<string[]>([]); // keyword ล่าสุด (โหลด client)
+  const [favs, setFavs] = useState<Set<string>>(new Set()); // keyword ที่ติดตามแล้ว (lowercase)
+  const [favoriting, setFavoriting] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setNow(Date.now());
     setRecent(loadRecent());
+    // โหลด keyword ที่ติดตามอยู่แล้ว (ไว้เช็คว่า favorite ไปแล้วไหม)
+    fetch("/api/keywords")
+      .then((r) => r.json())
+      .then((j) => setFavs(new Set((j.keywords ?? []).map((k: { keyword: string }) => k.keyword.toLowerCase()))))
+      .catch(() => {});
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // ติดตาม keyword นี้ (favorite) — เพิ่มเข้าระบบติดตามถาวร เหมือนหน้าแรก
+  async function favorite(keyword: string) {
+    if (favoriting || favs.has(keyword.toLowerCase())) return;
+    setFavoriting(true);
+    try {
+      const res = await fetch("/api/keywords", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword, label: keyword }),
+      });
+      if (res.ok) setFavs((s) => new Set(s).add(keyword.toLowerCase()));
+    } catch {
+      /* เงียบ */
+    } finally {
+      setFavoriting(false);
+    }
+  }
 
   const rate = now ? rateStatus(loadTimes(), now) : { ok: true, secondsLeft: 0, reason: "" };
   const searching = state.kind === "waiting";
@@ -308,11 +337,25 @@ export function SearchClient({ shopFilter }: { shopFilter?: boolean }) {
 
       {state.kind === "done" && (
         <>
-          {/* ลิงก์ไปหน้า search จริงบน Shopee ของคำค้นนี้ */}
+          {/* แถวหัวผลค้น: จำนวน + favorite (ติดตาม) + ลิงก์ Shopee */}
           <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
             <span className="muted">
               ผลค้น &quot;{state.keyword}&quot; · {state.rows.length} รายการ
             </span>
+            {favs.has(state.keyword.toLowerCase()) ? (
+              <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+                ★ ติดตามแล้ว
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => favorite(state.keyword)}
+                disabled={favoriting}
+                className="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-100 disabled:opacity-50"
+              >
+                ☆ ติดตาม keyword นี้
+              </button>
+            )}
             <a
               href={`https://shopee.co.th/search?keyword=${encodeURIComponent(state.keyword)}`}
               target="_blank"

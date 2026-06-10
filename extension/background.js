@@ -163,7 +163,9 @@ function shopeeMainWorldFetch(keyword, maxItems) {
       productUrl: `https://shopee.co.th/product/${b.shopid}/${b.itemid}`,
       price: toBaht(b.price ?? b.price_min),
       priceBefore: toBaht(b.price_before_discount ?? b.price_max_before_discount), // ราคาตั้ง (ก่อนลด)
-      sold: b.historical_sold ?? b.sold ?? null,
+      soldMonthly: b.sold ?? null, // ขาย/เดือน (เลขบนการ์ด Shopee)
+      soldTotal: b.historical_sold ?? b.global_sold_count ?? null, // ขายสะสมตลอด
+      sold: b.historical_sold ?? b.sold ?? null, // (legacy) คงไว้เผื่อโค้ดเดิม
       rating:
         rating.rating_star != null
           ? Math.round(rating.rating_star * 10) / 10

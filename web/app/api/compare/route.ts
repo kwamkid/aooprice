@@ -49,6 +49,8 @@ export async function GET(req: Request) {
       s.price,
       s.price_before,
       s.sold,
+      s.sold_monthly,
+      s.sold_total,
       s.rating,
       s.rating_count,
       s.is_official,
