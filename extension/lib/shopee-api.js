@@ -22,16 +22,25 @@ export async function fetchShopeeItems(keyword, { maxItems = 60 } = {}) {
       `&limit=${limit}&newest=${page * limit}&order=desc&page_type=search` +
       `&scenario=PAGE_GLOBAL_SEARCH&version=2`;
 
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        "x-api-source": "pc",
-        "x-shopee-language": "th",
-        "x-requested-with": "XMLHttpRequest",
-        referer: `https://shopee.co.th/search?keyword=${encodeURIComponent(keyword)}`,
-      },
-      credentials: "include",
-    });
+    const doFetch = () =>
+      fetch(url, {
+        method: "GET",
+        headers: {
+          "x-api-source": "pc",
+          "x-shopee-language": "th",
+          "x-requested-with": "XMLHttpRequest",
+          referer: `https://shopee.co.th/search?keyword=${encodeURIComponent(keyword)}`,
+        },
+        credentials: "include",
+      });
+
+    // 403/429 = anti-bot/throttle — มักเป็นเพราะ session ยังไม่พร้อม
+    // retry ได้ถึง 2 ครั้ง โดยรอนานขึ้นเรื่อย ๆ (ให้ Shopee เซ็ต token ครบ)
+    let res = await doFetch();
+    for (let attempt = 1; attempt <= 2 && (res.status === 403 || res.status === 429); attempt++) {
+      await new Promise((r) => setTimeout(r, attempt * 2500));
+      res = await doFetch();
+    }
 
     if (!res.ok) {
       throw new Error(`Shopee API HTTP ${res.status}`);

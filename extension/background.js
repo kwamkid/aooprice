@@ -129,7 +129,9 @@ async function scrapeAdhoc(platform, keyword) {
   const tab = await chrome.tabs.create({ url: make(keyword), active: false });
   try {
     await waitForTabComplete(tab.id);
-    await new Promise((r) => setTimeout(r, platform === "shopee" ? 1500 : 3500));
+    // รอให้ session/anti-bot token ของ marketplace เซ็ตครบก่อนยิง (กัน 403)
+    // ad-hoc เปิดแท็บใหม่สด ๆ จึงต้องรอนานกว่ารอบ auto ที่แท็บอุ่นอยู่แล้ว
+    await new Promise((r) => setTimeout(r, platform === "shopee" ? 3500 : 4500));
     const resp = await chrome.tabs.sendMessage(tab.id, {
       type: "SCRAPE_ONE_ADHOC",
       keyword,
