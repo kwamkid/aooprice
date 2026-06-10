@@ -126,12 +126,13 @@ async function pollSearchJob() {
 // เปิดแท็บ search ของ platform → สั่ง content ดึง keyword เดียว (คืน items ตรง ๆ ไม่ ingest)
 async function scrapeAdhoc(platform, keyword) {
   const make = PLATFORM_SEARCH[platform] || PLATFORM_SEARCH.shopee;
-  const tab = await chrome.tabs.create({ url: make(keyword), active: false });
+  // active:true = เปิดแท็บโชว์จริง (Shopee เห็นเป็น focus → anti-bot JS รันครบ เซ็ต token)
+  // background tab (active:false) มักโดน 403 เพราะหน้าไม่ถูก focus
+  const tab = await chrome.tabs.create({ url: make(keyword), active: true });
   try {
     await waitForTabComplete(tab.id);
-    // รอให้ session/anti-bot token ของ marketplace เซ็ตครบก่อนยิง (กัน 403)
-    // ad-hoc เปิดแท็บใหม่สด ๆ จึงต้องรอนานกว่ารอบ auto ที่แท็บอุ่นอยู่แล้ว
-    await new Promise((r) => setTimeout(r, platform === "shopee" ? 3500 : 4500));
+    // รอนานขึ้นให้ anti-bot token เซ็ตครบก่อนยิง (Shopee เข้มกับแท็บที่เพิ่งเปิด)
+    await new Promise((r) => setTimeout(r, platform === "shopee" ? 6000 : 5000));
     const resp = await chrome.tabs.sendMessage(tab.id, {
       type: "SCRAPE_ONE_ADHOC",
       keyword,
