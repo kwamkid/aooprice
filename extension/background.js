@@ -123,15 +123,43 @@ async function pollSearchJob() {
   }
 }
 
-// เปิดแท็บ search ของ platform → สั่ง content ดึง keyword เดียว (คืน items ตรง ๆ ไม่ ingest)
+// host ของแต่ละ platform ไว้หาแท็บที่เปิดอยู่แล้ว
+const PLATFORM_HOST = {
+  shopee: "shopee.co.th",
+  tiktok: "tiktok.com",
+  lazada: "lazada.co.th",
+};
+
+// ค้นสด: ใช้แท็บ platform ที่ "เปิดอยู่แล้ว" ก่อน (session อุ่น + ผ่าน CAPTCHA แล้ว)
+// เพราะแท็บที่เพิ่งเปิดใหม่ มักโดน CAPTCHA (Shopee เห็นเป็น session ไม่มีประวัติ browsing)
+// ไม่มีแท็บเดิม → เปิดใหม่เป็น fallback (อาจเจอ CAPTCHA — user ต้องเลื่อนเอง)
 async function scrapeAdhoc(platform, keyword) {
   const make = PLATFORM_SEARCH[platform] || PLATFORM_SEARCH.shopee;
-  // active:true = เปิดแท็บโชว์จริง (Shopee เห็นเป็น focus → anti-bot JS รันครบ เซ็ต token)
-  // background tab (active:false) มักโดน 403 เพราะหน้าไม่ถูก focus
+  const host = PLATFORM_HOST[platform] || PLATFORM_HOST.shopee;
+
+  // หาแท็บ platform ที่เปิดอยู่ (ครอบทั้ง host ตรง ๆ และ subdomain)
+  const existing = [
+    ...(await chrome.tabs.query({ url: `*://${host}/*` })),
+    ...(await chrome.tabs.query({ url: `*://*.${host}/*` })),
+  ];
+  const warmTab = existing.find((t) => t.id != null);
+
+  if (warmTab) {
+    // นำแท็บอุ่นที่มีอยู่ไปหน้า search ของ keyword นี้ แล้วดึง (ไม่ปิดแท็บ — เป็นของ user)
+    await navigateTab(warmTab.id, make(keyword));
+    await new Promise((r) => setTimeout(r, platform === "shopee" ? 2500 : 4000));
+    const resp = await chrome.tabs.sendMessage(warmTab.id, {
+      type: "SCRAPE_ONE_ADHOC",
+      keyword,
+    });
+    if (!resp?.ok) throw new Error(resp?.error || "ดึงไม่สำเร็จ");
+    return resp.items || [];
+  }
+
+  // ไม่มีแท็บเดิม → เปิดใหม่ (โอกาสเจอ CAPTCHA สูงกว่า)
   const tab = await chrome.tabs.create({ url: make(keyword), active: true });
   try {
     await waitForTabComplete(tab.id);
-    // รอนานขึ้นให้ anti-bot token เซ็ตครบก่อนยิง (Shopee เข้มกับแท็บที่เพิ่งเปิด)
     await new Promise((r) => setTimeout(r, platform === "shopee" ? 6000 : 5000));
     const resp = await chrome.tabs.sendMessage(tab.id, {
       type: "SCRAPE_ONE_ADHOC",
